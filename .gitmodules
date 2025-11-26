@@ -1,0 +1,3 @@
+[submodule "cicada-16"]
+	path = cicada-16
+	url = https://github.com/Semikit/cicada-16.git
