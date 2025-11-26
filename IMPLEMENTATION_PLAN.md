@@ -476,78 +476,6 @@ function TileEditorPage() {
 
 All components use these tokens, ensuring visual consistency across standalone and integrated contexts.
 
-## Development Phases
-
-### Phase 1 - Tile Editor Core
-
-**Goal:** Create and edit individual 8×8 tiles with basic tools
-
-- [ ] TileCanvas Web Component with zoom and grid
-- [ ] 16-color palette selector (one sub-palette active at a time)
-- [ ] RGB555 ColorPicker component
-- [ ] Drawing tools: pencil, fill
-- [ ] Tile preview at 1× scale
-- [ ] Export tile as 4bpp planar format
-- [ ] WASM integration for tile data
-
-### Phase 2 - Palette Management
-
-**Goal:** Manage Cicada-16's 256-color palette system
-
-- [ ] PaletteEditor Web Component for all 16 sub-palettes
-- [ ] Visual palette grid with color swatches
-- [ ] RGB555 color editor with sliders (0-31 range)
-- [ ] Sub-palette selector
-- [ ] Import/export palette data (.pal format)
-- [ ] Color transparency indicator for color 0
-
-### Phase 3 - Advanced Drawing Tools
-
-**Goal:** Complete the tile editing toolset
-
-- [ ] Line drawing tool
-- [ ] Rectangle tool (filled and outline)
-- [ ] Color picker/eyedropper tool
-- [ ] Undo/redo system
-- [ ] Tile bank for managing multiple tiles
-- [ ] Copy/paste tiles
-- [ ] Tile transformations (H-flip, V-flip, rotate)
-
-### Phase 4 - Tilemap Editor
-
-**Goal:** Arrange tiles into complete tilemaps
-
-- [ ] TilemapEditor Web Component
-- [ ] Grid-based tilemap layout (configurable dimensions)
-- [ ] Tile picker from tile bank
-- [ ] Per-tile attributes: H-Flip, V-Flip, Palette (0-7), Priority
-- [ ] Visual tilemap preview with scrolling
-- [ ] Export tilemap as 16-bit entries
-- [ ] Tilemap import/export
-
-### Phase 5 - Import/Export & Project Management
-
-**Goal:** Integrate with Cicada-16 development workflow
-
-- [ ] Project file format (JSON-based)
-- [ ] Save/load projects to IndexedDB
-- [ ] Download project files
-- [ ] Export binary tile data (.bin)
-- [ ] Export binary palette data (.pal)
-- [ ] Export C/Assembly headers (.h, .inc)
-- [ ] Import PNG with auto-palette generation
-- [ ] Export as PNG
-
-### Phase 6 - React Integration & Publishing
-
-**Goal:** Package for use in semikit website
-
-- [ ] Create React wrapper components
-- [ ] Package as npm module (`semitile-ui`)
-- [ ] Documentation for standalone and React usage
-- [ ] Published to npm registry
-- [ ] Integration examples
-
 ## Core Data Structures (Rust)
 
 ### Tile Representation
@@ -1091,9 +1019,11 @@ const unsigned short tilemap_level1[] = {
 This section outlines the step-by-step implementation strategy for building semitile. Each stage builds upon the previous one, creating a working prototype early and iterating from there.
 
 ### Stage 0: Project Setup & Foundation
+
 **Goal:** Set up the development environment and basic project structure
 
 **Tasks:**
+
 1. Initialize Rust workspace with `core/` and `web/` crates
 2. Configure `core/` crate for library compilation
 3. Configure `web/` crate with `wasm-bindgen` and `wasm-pack`
@@ -1108,11 +1038,13 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 1: Core Rust Implementation
+
 **Goal:** Implement all core data structures and conversion logic
 
 **Tasks:**
 
 #### 1.1 - Tile Implementation
+
 - Implement `Tile` struct in `core/src/tile.rs`
 - Implement `new()`, `set_pixel()`, `get_pixel()` methods
 - Implement `to_planar()` conversion (4bpp planar encoding)
@@ -1120,6 +1052,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Write unit tests for planar conversion (round-trip tests)
 
 #### 1.2 - Color and Palette Implementation
+
 - Implement `Color` struct in `core/src/palette.rs`
 - Implement RGB555 conversion: `to_rgb555()`, `from_rgb555()`
 - Implement RGB888 conversion: `to_rgb888()`, `from_rgb888()` (for browser display)
@@ -1128,6 +1061,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Write unit tests for color conversions and palette operations
 
 #### 1.3 - Tilemap Implementation
+
 - Implement `TilemapEntry` struct in `core/src/tilemap.rs`
 - Implement `to_u16()` and `from_u16()` for 16-bit packing/unpacking
 - Implement `Tilemap` struct with grid operations
@@ -1135,6 +1069,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Write unit tests for tilemap entry packing and tilemap operations
 
 #### 1.4 - Export Utilities
+
 - Create `core/src/export.rs` for export format generation
 - Implement C header file generation
 - Implement Assembly (.inc) file generation
@@ -1145,16 +1080,19 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 2: WASM Bindings
+
 **Goal:** Create JavaScript API for the Rust core
 
 **Tasks:**
 
 #### 2.1 - WASM Project Setup
+
 - Configure `web/Cargo.toml` with dependencies (`wasm-bindgen`, `console_error_panic_hook`)
 - Set up build script for WASM compilation
 - Create output directory structure
 
 #### 2.2 - TileEditor WASM Bindings
+
 - Implement `TileEditor` struct in `web/src/lib.rs`
 - Expose pixel manipulation methods: `set_pixel()`, `get_pixel()`
 - Expose tile import/export: `export_planar()`, `import_planar()`
@@ -1163,6 +1101,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Set up panic hook for better debugging in browser
 
 #### 2.3 - WASM Module Building & Testing
+
 - Build WASM module with `wasm-pack build --target web`
 - Create simple HTML test page to verify WASM loads correctly
 - Test all exposed methods from JavaScript console
@@ -1173,16 +1112,19 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 3: UI Foundation & Design System
+
 **Goal:** Set up UI infrastructure and shared styling
 
 **Tasks:**
 
 #### 3.1 - UI Project Setup
+
 - Initialize `ui/package.json` with Vite and development dependencies
 - Configure Vite for ES modules and WASM support
 - Set up development server with hot reload
 
 #### 3.2 - Design System
+
 - Create `ui/src/styles/tokens.css` with CSS custom properties
   - Cicada-16 brand colors
   - Spacing scale
@@ -1192,6 +1134,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Create `ui/src/styles/common.css` for shared component styles
 
 #### 3.3 - WASM Loader Utility
+
 - Create `ui/src/lib/wasm-loader.js`
 - Implement async WASM module initialization
 - Export singleton instance for components to use
@@ -1202,17 +1145,20 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 4: TileCanvas Component (MVP)
+
 **Goal:** Create the first working component - the tile editing canvas
 
 **Tasks:**
 
 #### 4.1 - TileCanvas Web Component Structure
+
 - Create `ui/src/components/TileCanvas/` directory
 - Implement basic Web Component class structure
 - Set up Shadow DOM
 - Implement `connectedCallback()` lifecycle
 
 #### 4.2 - Canvas Setup & Rendering
+
 - Create canvas element in Shadow DOM
 - Initialize 2D rendering context
 - Implement `redraw()` method to render tile from WASM
@@ -1220,17 +1166,20 @@ This section outlines the step-by-step implementation strategy for building semi
 - Add image-rendering CSS for crisp pixels
 
 #### 4.3 - Grid Overlay
+
 - Implement `drawGrid()` method
 - Make grid toggleable via attribute
 - Style grid with semi-transparent lines
 
 #### 4.4 - Mouse Interaction
+
 - Implement mouse event listeners (mousedown, mousemove, mouseup)
 - Convert mouse coordinates to tile pixel coordinates
 - Implement basic pencil drawing tool
 - Add drawing state management (isDrawing flag)
 
 #### 4.5 - Component Attributes & Events
+
 - Implement `observedAttributes` for reactive updates
 - Add `zoom`, `grid`, `active-palette` attributes
 - Dispatch custom `pixel-changed` event
@@ -1241,33 +1190,39 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 5: PaletteEditor Component
+
 **Goal:** Allow users to view and select colors from a palette
 
 **Tasks:**
 
 #### 5.1 - PaletteEditor Structure
+
 - Create `ui/src/components/PaletteEditor/` directory
 - Implement Web Component class
 - Set up Shadow DOM with grid layout
 
 #### 5.2 - Palette Grid Rendering
+
 - Render 16 color swatches for active sub-palette
 - Display colors using data from WASM
 - Highlight selected color
 - Show color index numbers
 
 #### 5.3 - Color Selection
+
 - Implement click handlers for color swatches
 - Track selected color index
 - Dispatch `color-selected` custom event
 - Update visual selection indicator
 
 #### 5.4 - Sub-Palette Switching
+
 - Add sub-palette selector dropdown (0-15)
 - Update displayed colors when sub-palette changes
 - Persist selected sub-palette
 
 #### 5.5 - Styling
+
 - Create `PaletteEditor.css` with grid layout
 - Style color swatches with borders and hover effects
 - Add selection highlighting
@@ -1278,33 +1233,39 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 6: ColorPicker Component
+
 **Goal:** Allow users to edit individual colors in RGB555 format
 
 **Tasks:**
 
 #### 6.1 - ColorPicker Structure
+
 - Create `ui/src/components/ColorPicker/` directory
 - Implement Web Component class
 - Set up Shadow DOM with form layout
 
 #### 6.2 - RGB555 Sliders
+
 - Create three range inputs for R, G, B (0-31 range)
 - Display current color value as RGB555 hex
 - Show live color preview swatch
 - Display 8-bit RGB values for reference
 
 #### 6.3 - Color Editing
+
 - Load current color when selection changes
 - Update WASM palette when sliders change
 - Dispatch `color-changed` custom event
 - Debounce slider updates for performance
 
 #### 6.4 - Hex Input (Optional)
+
 - Add text input for direct RGB555 hex entry
 - Validate hex input format
 - Update sliders from hex input
 
 #### 6.5 - Styling
+
 - Create `ColorPicker.css`
 - Style sliders with custom track colors
 - Add color preview swatch
@@ -1315,35 +1276,41 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 7: Standalone App Integration
+
 **Goal:** Wire up components into a working standalone application
 
 **Tasks:**
 
 #### 7.1 - HTML Structure
+
 - Create `ui/src/standalone/index.html`
 - Set up semantic HTML structure (header, main, aside)
 - Create layout grid for component placement
 - Add navigation buttons (New, Save, Export)
 
 #### 7.2 - Component Integration
+
 - Create `ui/src/standalone/app.js`
 - Import all Web Components
 - Initialize component instances
 - Wire up event listeners between components
 
 #### 7.3 - Component Communication
+
 - Connect TileCanvas ↔ PaletteEditor (color selection)
 - Connect PaletteEditor ↔ ColorPicker (color editing)
 - Connect ColorPicker → TileCanvas (trigger redraw on color change)
 - Implement shared state management
 
 #### 7.4 - Layout & Styling
+
 - Create `ui/src/standalone/styles.css`
 - Implement responsive layout
 - Style header and navigation
 - Add panel styling for component containers
 
 #### 7.5 - WASM Integration
+
 - Initialize WASM module on page load
 - Pass WASM instance to all components
 - Add loading state while WASM initializes
@@ -1354,32 +1321,38 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 8: ToolPanel & Drawing Tools
+
 **Goal:** Add additional drawing tools beyond basic pencil
 
 **Tasks:**
 
 #### 8.1 - ToolPanel Component
+
 - Create `ui/src/components/ToolPanel/` directory
 - Implement Web Component class
 - Add tool selection buttons (Pencil, Fill, Line, Rectangle)
 - Dispatch `tool-selected` event
 
 #### 8.2 - Fill Tool
+
 - Implement flood fill algorithm
 - Add fill tool to TileCanvas
 - Handle fill on mouse click
 
 #### 8.3 - Line Tool
+
 - Implement Bresenham's line algorithm
 - Add line drawing mode to TileCanvas
 - Show preview line while dragging
 
 #### 8.4 - Rectangle Tool
+
 - Implement rectangle drawing (filled and outline)
 - Add mode toggle for filled vs outline
 - Show preview rectangle while dragging
 
 #### 8.5 - Tool Options
+
 - Add tool-specific options (e.g., filled vs outline for rectangle)
 - Add grid toggle checkbox
 - Add zoom slider
@@ -1389,11 +1362,13 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 9: File Operations & Export
+
 **Goal:** Enable saving, loading, and exporting work
 
 **Tasks:**
 
 #### 9.1 - Export Manager Utility
+
 - Create `ui/src/lib/ExportManager.js` class
 - Implement binary tile data export (.bin)
 - Implement binary palette export (.pal)
@@ -1401,11 +1376,13 @@ This section outlines the step-by-step implementation strategy for building semi
 - Implement Assembly header generation
 
 #### 9.2 - File Download
+
 - Implement browser file download functionality
 - Add download buttons to UI
 - Generate appropriate filenames with extensions
 
 #### 9.3 - Project Format
+
 - Define JSON-based project file format
   - Tile data (planar format base64 encoded)
   - Palette data (RGB555 values)
@@ -1413,12 +1390,14 @@ This section outlines the step-by-step implementation strategy for building semi
 - Implement project serialization/deserialization
 
 #### 9.4 - IndexedDB Storage
+
 - Create `ui/src/lib/storage.js` wrapper
 - Implement auto-save to IndexedDB
 - Add save/load UI
 - Show list of saved projects
 
 #### 9.5 - File Import
+
 - Add file input for loading projects
 - Parse and validate project files
 - Load tile and palette data into WASM
@@ -1429,28 +1408,33 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 10: Tile Bank
+
 **Goal:** Manage multiple tiles instead of just one
 
 **Tasks:**
 
 #### 10.1 - Tile Bank Data Structure
+
 - Extend WASM bindings to support multiple tiles
 - Implement tile array/vector in TileEditor
 - Add methods: `add_tile()`, `delete_tile()`, `get_tile()`, `set_active_tile()`
 
 #### 10.2 - Tile Bank UI Component
+
 - Create mini-grid of tile thumbnails
 - Implement tile selection
 - Add new/delete tile buttons
 - Show active tile indicator
 
 #### 10.3 - Tile Operations
+
 - Implement copy/paste tiles
 - Implement duplicate tile
 - Implement clear tile
 - Add tile reordering (drag & drop)
 
 #### 10.4 - Tile Bank Integration
+
 - Update TileCanvas to work with active tile from bank
 - Update file operations to save/load all tiles
 - Export all tiles in batch
@@ -1460,27 +1444,32 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 11: TilemapEditor Component
+
 **Goal:** Arrange tiles into tilemaps
 
 **Tasks:**
 
 #### 11.1 - TilemapEditor Component Structure
+
 - Create `ui/src/components/TilemapEditor/` directory
 - Implement Web Component class
 - Create canvas for tilemap display
 
 #### 11.2 - Tilemap Rendering
+
 - Render grid of tiles from Tile Bank
 - Implement scrolling/panning
 - Show tile boundaries
 - Render with proper palette per tile
 
 #### 11.3 - Tile Placement
+
 - Implement tile selection from bank
 - Place tiles on click
 - Show tile preview while hovering
 
 #### 11.4 - Tile Attributes
+
 - Add attribute editing panel
 - Implement H-Flip toggle
 - Implement V-Flip toggle
@@ -1488,6 +1477,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Implement priority toggle
 
 #### 11.5 - Tilemap Export
+
 - Export tilemap as binary data
 - Export as C/Assembly arrays
 - Include tilemap dimensions in export
@@ -1497,32 +1487,38 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 12: Advanced Features & Polish
+
 **Goal:** Add quality-of-life features and polish
 
 **Tasks:**
 
 #### 12.1 - Undo/Redo System
+
 - Implement command pattern for actions
 - Add undo/redo stack
 - Wire up keyboard shortcuts (Ctrl+Z, Ctrl+Y)
 
 #### 12.2 - Keyboard Shortcuts
+
 - Add keyboard navigation
 - Implement tool hotkeys (P=Pencil, F=Fill, etc.)
 - Add color selection shortcuts (0-9 for first 10 colors)
 
 #### 12.3 - PNG Import/Export
+
 - Implement PNG import with palette quantization
 - Implement PNG export of current tile
 - Support batch PNG export of tile bank
 
 #### 12.4 - UI Polish
+
 - Add tooltips to all buttons and controls
 - Improve loading states
 - Add error messages for invalid operations
 - Improve responsive layout for different screen sizes
 
 #### 12.5 - Testing & Bug Fixes
+
 - Test all features end-to-end
 - Fix rendering bugs
 - Optimize performance
@@ -1533,11 +1529,13 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 13: React Wrappers
+
 **Goal:** Create React components for semikit website integration
 
 **Tasks:**
 
 #### 13.1 - React Wrapper Components
+
 - Create `ui/src/react/TileCanvasReact.jsx`
 - Create `ui/src/react/PaletteEditorReact.jsx`
 - Create `ui/src/react/ColorPickerReact.jsx`
@@ -1545,17 +1543,20 @@ This section outlines the step-by-step implementation strategy for building semi
 - Create `ui/src/react/TilemapEditorReact.jsx`
 
 #### 13.2 - React Integration Patterns
+
 - Implement proper useEffect cleanup
 - Handle ref management for Web Components
 - Implement prop → attribute synchronization
 - Convert custom events to React callbacks
 
 #### 13.3 - React Example Page
+
 - Create example React app demonstrating usage
 - Document all component props
 - Show event handling patterns
 
 #### 13.4 - TypeScript Definitions
+
 - Create `.d.ts` files for all components
 - Type all props and events
 - Document component APIs
@@ -1565,11 +1566,13 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 14: Documentation & Publishing
+
 **Goal:** Prepare for public release and npm publishing
 
 **Tasks:**
 
 #### 14.1 - Documentation
+
 - Write comprehensive README
 - Document all Web Components (attributes, events, methods)
 - Document React wrappers
@@ -1577,24 +1580,28 @@ This section outlines the step-by-step implementation strategy for building semi
 - Write integration guide for semikit website
 
 #### 14.2 - API Documentation
+
 - Document WASM API
 - Document export formats
 - Document file formats
 - Create Cicada-16 integration guide
 
 #### 14.3 - Build & Package
+
 - Configure production build
 - Optimize WASM size
 - Minify JavaScript/CSS
 - Generate source maps
 
 #### 14.4 - NPM Publishing
+
 - Finalize `package.json` metadata
 - Create `.npmignore`
 - Publish to npm as `semitile-ui`
 - Verify package installation and imports
 
 #### 14.5 - Demo Deployment
+
 - Deploy standalone app to GitHub Pages or Netlify
 - Create public demo URL
 - Add demo to semikit website
@@ -1604,9 +1611,11 @@ This section outlines the step-by-step implementation strategy for building semi
 ---
 
 ### Stage 15: Future Iterations
+
 **Goal:** Continue improving based on user feedback
 
 **Potential Features:**
+
 - Animation preview system
 - Sprite editor with OAM attributes
 - Auto-tiling tools
