@@ -21,8 +21,10 @@ The UI is designed as a **modular, reusable component system** that can:
 ### Tech Stack
 
 - **Rust + WASM** for core logic (tile conversion, planar encoding, palette handling)
-- **Web Components** for UI components (framework-agnostic, reusable)
-- **Class-based utilities** for business logic (state management, rendering, export)
+- **MVC Architecture** with clear separation of concerns:
+  - **Models**: Observable state containers with WASM integration
+  - **Views**: Web Components for UI (framework-agnostic, reusable)
+  - **Controllers**: Coordinate between Models and Views
 - **Canvas API** for pixel-perfect tile editing
 - **IndexedDB** for project persistence
 - **CSS Custom Properties** for shared design tokens
@@ -49,9 +51,16 @@ semitile/
     ├── package.json
     ├── vite.config.js                   # Build configuration
     ├── src/
-    │   ├── components/                  # Reusable Web Components
+    │   ├── models/                      # MODEL LAYER - Observable state
+    │   │   ├── EventEmitter.ts         # Base event emitter class
+    │   │   ├── TileModel.ts            # Tile state + WASM integration
+    │   │   ├── PaletteModel.ts         # Palette state + WASM integration
+    │   │   ├── TilemapModel.ts         # Tilemap state + WASM integration
+    │   │   ├── EditorState.ts          # Global editor state (tool, zoom, etc.)
+    │   │   └── CommandHistory.ts       # Undo/redo command stack
+    │   ├── views/                       # VIEW LAYER - Web Components
     │   │   ├── TileCanvas/
-    │   │   │   ├── TileCanvas.ts       # Web Component implementation
+    │   │   │   ├── TileCanvas.ts       # Pure view component
     │   │   │   ├── TileCanvas.css      # Component styles
     │   │   │   └── index.ts            # Component exports
     │   │   ├── PaletteEditor/
@@ -70,9 +79,13 @@ semitile/
     │   │       ├── ToolPanel.ts
     │   │       ├── ToolPanel.css
     │   │       └── index.ts
-    │   ├── lib/                         # Utilities (class-based)
+    │   ├── controllers/                 # CONTROLLER LAYER - Business logic
+    │   │   ├── TileEditorController.ts # Tile editing coordination
+    │   │   ├── PaletteController.ts    # Palette editing coordination
+    │   │   ├── TilemapController.ts    # Tilemap editing coordination
+    │   │   └── FileController.ts       # File operations coordination
+    │   ├── lib/                         # Utilities
     │   │   ├── wasm-loader.ts          # WASM initialization
-    │   │   ├── EditorState.ts          # State management
     │   │   ├── CanvasRenderer.ts       # Canvas rendering utilities
     │   │   ├── ExportManager.ts        # Export logic
     │   │   └── storage.ts              # IndexedDB wrapper
@@ -96,33 +109,242 @@ semitile/
 
 ## Component Architecture
 
-### Hybrid Approach: Web Components + Class-based Utilities
+### MVC Architecture with Observable Models
 
-**Web Components** are used for all visual UI elements:
+**Model Layer (Observable State):**
 
+- Contains application state and wraps WASM functionality
+- Emits events when state changes (Observer pattern)
+- Single source of truth for all data
+- Supports undo/redo through command history
+- Examples: `TileModel`, `PaletteModel`, `EditorState`
+
+**View Layer (Web Components):**
+
+- Pure presentation components with no business logic
+- Listen to Model events and re-render when state changes
+- Dispatch user interaction events to Controllers
 - Framework-agnostic (works in vanilla JS, React, Vue, etc.)
 - Encapsulated styling with Shadow DOM
-- Custom events for communication
-- HTML attributes for configuration
+- Examples: `TileCanvas`, `PaletteEditor`, `ColorPicker`
 
-**Class-based utilities** handle business logic:
+**Controller Layer (Business Logic):**
 
-- State management
-- Rendering algorithms
-- Export/import operations
-- Data transformations
+- Mediates between Views and Models
+- Handles user interaction events from Views
+- Updates Models based on user actions
+- Coordinates updates across multiple Views
+- Contains tool logic, validation, and business rules
+- Examples: `TileEditorController`, `PaletteController`
 
-### Example: TileCanvas Web Component
+### MVC Architecture Examples
+
+#### Model Layer: EventEmitter Base Class
 
 ```typescript
-// ui/src/components/TileCanvas/TileCanvas.ts
+// ui/src/models/EventEmitter.ts
+export class EventEmitter {
+  private listeners: Map<string, Set<Function>> = new Map();
+
+  on(event: string, callback: Function): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, new Set());
+    }
+    this.listeners.get(event)!.add(callback);
+  }
+
+  off(event: string, callback: Function): void {
+    this.listeners.get(event)?.delete(callback);
+  }
+
+  emit(event: string, data?: any): void {
+    this.listeners.get(event)?.forEach(callback => callback(data));
+  }
+}
+```
+
+#### Model Layer: TileModel
+
+```typescript
+// ui/src/models/TileModel.ts
+import { EventEmitter } from './EventEmitter.js';
+import type { Tile } from '../../wasm/semitile_web.js';
+
+export class TileModel extends EventEmitter {
+  private tile: Tile;
+  private activeTileIndex: number = 0;
+
+  constructor(wasmTile: Tile) {
+    super();
+    this.tile = wasmTile;
+  }
+
+  // Getters
+  getPixel(x: number, y: number): number {
+    return this.tile.get_pixel(x, y);
+  }
+
+  // Setters that emit events
+  setPixel(x: number, y: number, colorIndex: number): void {
+    this.tile.set_pixel(x, y, colorIndex);
+    this.emit('pixelChanged', { x, y, colorIndex });
+  }
+
+  // Import/Export
+  importPlanar(data: Uint8Array): void {
+    this.tile = Tile.from_planar(data);
+    this.emit('tileImported');
+  }
+
+  exportPlanar(): Uint8Array {
+    return this.tile.to_planar();
+  }
+
+  clear(): void {
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 8; x++) {
+        this.tile.set_pixel(x, y, 0);
+      }
+    }
+    this.emit('tileCleared');
+  }
+}
+```
+
+#### Model Layer: PaletteModel
+
+```typescript
+// ui/src/models/PaletteModel.ts
+import { EventEmitter } from './EventEmitter.js';
+import type { Palette, Color } from '../../wasm/semitile_web.js';
+
+export class PaletteModel extends EventEmitter {
+  private palette: Palette;
+  private activeSubPalette: number = 0;
+  private selectedColorIndex: number = 1; // 0 is transparent
+
+  constructor(wasmPalette: Palette) {
+    super();
+    this.palette = wasmPalette;
+  }
+
+  // Getters
+  getColor(paletteIdx: number, colorIdx: number): { r: number; g: number; b: number } {
+    const color = this.palette.get_color(paletteIdx, colorIdx);
+    const [r, g, b] = color.to_rgb888();
+    return { r, g, b };
+  }
+
+  getActiveSubPalette(): number {
+    return this.activeSubPalette;
+  }
+
+  getSelectedColorIndex(): number {
+    return this.selectedColorIndex;
+  }
+
+  // Setters that emit events
+  setColor(paletteIdx: number, colorIdx: number, r: number, g: number, b: number): void {
+    const color = Color.from_rgb888(r, g, b);
+    this.palette.set_color(paletteIdx, colorIdx, color);
+    this.emit('colorChanged', { paletteIdx, colorIdx, r, g, b });
+  }
+
+  setActiveSubPalette(index: number): void {
+    this.activeSubPalette = index;
+    this.emit('subPaletteChanged', { index });
+  }
+
+  selectColor(colorIndex: number): void {
+    this.selectedColorIndex = colorIndex;
+    this.emit('colorSelected', { colorIndex });
+  }
+
+  // Import/Export
+  importBinary(data: Uint8Array): boolean {
+    const imported = Palette.import_binary(data);
+    if (imported) {
+      this.palette = imported;
+      this.emit('paletteImported');
+      return true;
+    }
+    return false;
+  }
+
+  exportBinary(): Uint8Array {
+    return this.palette.export_binary();
+  }
+}
+```
+
+#### Model Layer: EditorState
+
+```typescript
+// ui/src/models/EditorState.ts
+import { EventEmitter } from './EventEmitter.js';
+
+export enum Tool {
+  Pencil = 'pencil',
+  Fill = 'fill',
+  Line = 'line',
+  Rectangle = 'rectangle',
+}
+
+export class EditorState extends EventEmitter {
+  private currentTool: Tool = Tool.Pencil;
+  private zoom: number = 16;
+  private gridEnabled: boolean = true;
+
+  // Tool management
+  setTool(tool: Tool): void {
+    this.currentTool = tool;
+    this.emit('toolChanged', { tool });
+  }
+
+  getTool(): Tool {
+    return this.currentTool;
+  }
+
+  // Zoom management
+  setZoom(zoom: number): void {
+    this.zoom = Math.max(1, Math.min(32, zoom));
+    this.emit('zoomChanged', { zoom: this.zoom });
+  }
+
+  getZoom(): number {
+    return this.zoom;
+  }
+
+  // Grid toggle
+  setGridEnabled(enabled: boolean): void {
+    this.gridEnabled = enabled;
+    this.emit('gridToggled', { enabled });
+  }
+
+  isGridEnabled(): boolean {
+    return this.gridEnabled;
+  }
+}
+```
+
+#### View Layer: TileCanvas (Pure View)
+
+```typescript
+// ui/src/views/TileCanvas/TileCanvas.ts
+import type { TileModel } from '../../models/TileModel.js';
+import type { PaletteModel } from '../../models/PaletteModel.js';
+import type { EditorState } from '../../models/EditorState.js';
+
 class TileCanvas extends HTMLElement {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private tileModel: TileModel | null = null;
+  private paletteModel: PaletteModel | null = null;
+  private editorState: EditorState | null = null;
+
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.zoom = 16;
-    this.gridEnabled = true;
-    this.activePalette = 0;
   }
 
   connectedCallback() {
@@ -131,27 +353,51 @@ class TileCanvas extends HTMLElement {
     this.attachEventListeners();
   }
 
-  static get observedAttributes() {
-    return ["zoom", "grid", "active-palette"];
+  disconnectedCallback() {
+    // Clean up model listeners
+    if (this.tileModel) {
+      this.tileModel.off('pixelChanged', this.handleModelChange);
+      this.tileModel.off('tileImported', this.handleModelChange);
+      this.tileModel.off('tileCleared', this.handleModelChange);
+    }
+    if (this.paletteModel) {
+      this.paletteModel.off('colorChanged', this.handleModelChange);
+      this.paletteModel.off('paletteImported', this.handleModelChange);
+    }
+    if (this.editorState) {
+      this.editorState.off('zoomChanged', this.handleStateChange);
+      this.editorState.off('gridToggled', this.handleStateChange);
+    }
   }
 
-  attributeChangedCallback(name, oldValue, newValue) {
-    if (name === "zoom") {
-      this.zoom = parseInt(newValue);
-      this.redraw();
-    }
-    if (name === "grid") {
-      this.gridEnabled = newValue === "true";
-      this.redraw();
-    }
-    if (name === "active-palette") {
-      this.activePalette = parseInt(newValue);
-      this.redraw();
-    }
+  // Inject dependencies (called by controller)
+  setModels(tileModel: TileModel, paletteModel: PaletteModel, editorState: EditorState): void {
+    this.tileModel = tileModel;
+    this.paletteModel = paletteModel;
+    this.editorState = editorState;
+
+    // Listen to model changes
+    this.tileModel.on('pixelChanged', this.handleModelChange);
+    this.tileModel.on('tileImported', this.handleModelChange);
+    this.tileModel.on('tileCleared', this.handleModelChange);
+    this.paletteModel.on('colorChanged', this.handleModelChange);
+    this.paletteModel.on('paletteImported', this.handleModelChange);
+    this.editorState.on('zoomChanged', this.handleStateChange);
+    this.editorState.on('gridToggled', this.handleStateChange);
+
+    this.redraw();
   }
+
+  private handleModelChange = () => {
+    this.redraw();
+  };
+
+  private handleStateChange = () => {
+    this.redraw();
+  };
 
   render() {
-    this.shadowRoot.innerHTML = `
+    this.shadowRoot!.innerHTML = `
       <link rel="stylesheet" href="./TileCanvas.css">
       <div class="tile-canvas-container">
         <canvas id="canvas" width="128" height="128"></canvas>
@@ -160,91 +406,178 @@ class TileCanvas extends HTMLElement {
   }
 
   setupCanvas() {
-    this.canvas = this.shadowRoot.getElementById("canvas");
-    this.ctx = this.canvas.getContext("2d", { alpha: false });
-    this.initializeWasm();
+    this.canvas = this.shadowRoot!.getElementById("canvas") as HTMLCanvasElement;
+    this.ctx = this.canvas.getContext("2d", { alpha: false })!;
   }
 
-  async initializeWasm() {
-    const { TileEditor } = await import("../../lib/wasm-loader.js");
-    this.editor = new TileEditor();
-    this.redraw();
-  }
-
-  setPixel(x, y, colorIndex) {
-    this.editor.set_pixel(x, y, colorIndex);
-    this.redraw();
-    this.dispatchEvent(
-      new CustomEvent("pixel-changed", {
-        detail: { x, y, colorIndex },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
-
+  // Pure rendering - no business logic
   redraw() {
-    // Render tile to canvas using WASM editor
+    if (!this.tileModel || !this.paletteModel || !this.editorState) return;
+
+    const zoom = this.editorState.getZoom();
+    const activePalette = this.paletteModel.getActiveSubPalette();
+
+    this.canvas.width = 8 * zoom;
+    this.canvas.height = 8 * zoom;
+
+    // Render pixels
     for (let y = 0; y < 8; y++) {
       for (let x = 0; x < 8; x++) {
-        const colorIdx = this.editor.get_pixel(x, y);
-        const rgb = this.editor.get_color_rgb(this.activePalette, colorIdx);
-        this.ctx.fillStyle = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-        this.ctx.fillRect(x * this.zoom, y * this.zoom, this.zoom, this.zoom);
+        const colorIdx = this.tileModel.getPixel(x, y);
+        const { r, g, b } = this.paletteModel.getColor(activePalette, colorIdx);
+        this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        this.ctx.fillRect(x * zoom, y * zoom, zoom, zoom);
       }
     }
 
-    if (this.gridEnabled) {
-      this.drawGrid();
+    // Draw grid if enabled
+    if (this.editorState.isGridEnabled()) {
+      this.drawGrid(zoom);
     }
   }
 
-  drawGrid() {
+  drawGrid(zoom: number) {
     this.ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
     this.ctx.lineWidth = 1;
     for (let i = 0; i <= 8; i++) {
-      const pos = i * this.zoom;
+      const pos = i * zoom;
       this.ctx.beginPath();
       this.ctx.moveTo(pos, 0);
-      this.ctx.lineTo(pos, 8 * this.zoom);
+      this.ctx.lineTo(pos, 8 * zoom);
       this.ctx.stroke();
       this.ctx.beginPath();
       this.ctx.moveTo(0, pos);
-      this.ctx.lineTo(8 * this.zoom, pos);
+      this.ctx.lineTo(8 * zoom, pos);
       this.ctx.stroke();
     }
   }
 
   attachEventListeners() {
-    let isDrawing = false;
-
     this.canvas.addEventListener("mousedown", (e) => {
-      isDrawing = true;
-      this.handleDraw(e);
+      this.dispatchInteractionEvent('draw-start', e);
     });
 
     this.canvas.addEventListener("mousemove", (e) => {
-      if (isDrawing) this.handleDraw(e);
+      this.dispatchInteractionEvent('draw-move', e);
     });
 
-    this.canvas.addEventListener("mouseup", () => {
-      isDrawing = false;
+    this.canvas.addEventListener("mouseup", (e) => {
+      this.dispatchInteractionEvent('draw-end', e);
     });
   }
 
-  handleDraw(e) {
+  // Dispatch events to controller - no direct model modification
+  private dispatchInteractionEvent(type: string, e: MouseEvent) {
     const rect = this.canvas.getBoundingClientRect();
-    const x = Math.floor((e.clientX - rect.left) / this.zoom);
-    const y = Math.floor((e.clientY - rect.top) / this.zoom);
+    const zoom = this.editorState?.getZoom() || 16;
+    const x = Math.floor((e.clientX - rect.left) / zoom);
+    const y = Math.floor((e.clientY - rect.top) / zoom);
 
     if (x >= 0 && x < 8 && y >= 0 && y < 8) {
-      this.setPixel(x, y, this.activeColorIndex || 0);
+      this.dispatchEvent(new CustomEvent(type, {
+        detail: { x, y },
+        bubbles: true,
+        composed: true,
+      }));
     }
   }
 }
 
 customElements.define("tile-canvas", TileCanvas);
 export default TileCanvas;
+```
+
+#### Controller Layer: TileEditorController
+
+```typescript
+// ui/src/controllers/TileEditorController.ts
+import { TileModel } from '../models/TileModel.js';
+import { PaletteModel } from '../models/PaletteModel.js';
+import { EditorState, Tool } from '../models/EditorState.js';
+import type TileCanvas from '../views/TileCanvas/TileCanvas.js';
+
+export class TileEditorController {
+  private isDrawing: boolean = false;
+
+  constructor(
+    private tileModel: TileModel,
+    private paletteModel: PaletteModel,
+    private editorState: EditorState,
+    private view: TileCanvas
+  ) {
+    this.setupView();
+    this.attachViewListeners();
+  }
+
+  private setupView() {
+    // Inject models into view
+    this.view.setModels(this.tileModel, this.paletteModel, this.editorState);
+  }
+
+  private attachViewListeners() {
+    this.view.addEventListener('draw-start', (e: CustomEvent) => {
+      this.isDrawing = true;
+      this.handleDraw(e.detail.x, e.detail.y);
+    });
+
+    this.view.addEventListener('draw-move', (e: CustomEvent) => {
+      if (this.isDrawing) {
+        this.handleDraw(e.detail.x, e.detail.y);
+      }
+    });
+
+    this.view.addEventListener('draw-end', () => {
+      this.isDrawing = false;
+    });
+  }
+
+  // Business logic: handle drawing based on active tool
+  private handleDraw(x: number, y: number) {
+    const tool = this.editorState.getTool();
+    const colorIndex = this.paletteModel.getSelectedColorIndex();
+
+    switch (tool) {
+      case Tool.Pencil:
+        this.tileModel.setPixel(x, y, colorIndex);
+        break;
+      case Tool.Fill:
+        this.floodFill(x, y, colorIndex);
+        break;
+      // Other tools handled similarly
+    }
+  }
+
+  private floodFill(startX: number, startY: number, newColor: number) {
+    const targetColor = this.tileModel.getPixel(startX, startY);
+    if (targetColor === newColor) return;
+
+    const stack: [number, number][] = [[startX, startY]];
+
+    while (stack.length > 0) {
+      const [x, y] = stack.pop()!;
+
+      if (x < 0 || x >= 8 || y < 0 || y >= 8) continue;
+      if (this.tileModel.getPixel(x, y) !== targetColor) continue;
+
+      this.tileModel.setPixel(x, y, newColor);
+
+      stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    }
+  }
+
+  // Public methods for external control
+  clear() {
+    this.tileModel.clear();
+  }
+
+  undo() {
+    // Integrate with CommandHistory
+  }
+
+  redo() {
+    // Integrate with CommandHistory
+  }
+}
 ```
 
 ### Usage in Standalone App (Vanilla JS)
@@ -300,51 +633,94 @@ export default TileCanvas;
 
 ```typescript
 // ui/src/standalone/app.ts
-import "../components/TileCanvas/TileCanvas.js";
-import "../components/PaletteEditor/PaletteEditor.js";
-import "../components/ColorPicker/ColorPicker.js";
-import "../components/ToolPanel/ToolPanel.js";
+import { initWasm } from "../lib/wasm-loader.js";
+import { TileModel } from "../models/TileModel.js";
+import { PaletteModel } from "../models/PaletteModel.js";
+import { EditorState } from "../models/EditorState.js";
+import { TileEditorController } from "../controllers/TileEditorController.js";
+import { PaletteController } from "../controllers/PaletteController.js";
+import { FileController } from "../controllers/FileController.js";
 
-// Initialize components
-const tileCanvas = document.getElementById("tile-canvas");
-const paletteEditor = document.getElementById("palette");
-const colorPicker = document.getElementById("color-picker");
-const toolPanel = document.getElementById("tools");
+import "../views/TileCanvas/TileCanvas.js";
+import "../views/PaletteEditor/PaletteEditor.js";
+import "../views/ColorPicker/ColorPicker.js";
+import "../views/ToolPanel/ToolPanel.js";
 
-// Wire up events
-tileCanvas.addEventListener("pixel-changed", (e) => {
-  console.log("Pixel changed:", e.detail);
-});
+async function main() {
+  // Initialize WASM
+  const wasm = await initWasm();
 
-paletteEditor.addEventListener("color-selected", (e) => {
-  tileCanvas.activeColorIndex = e.detail.colorIndex;
-  colorPicker.setAttribute("color-index", e.detail.colorIndex);
-});
+  // Create Models (single source of truth)
+  const tileModel = new TileModel(new wasm.Tile());
+  const paletteModel = new PaletteModel(new wasm.Palette());
+  const editorState = new EditorState();
 
-colorPicker.addEventListener("color-changed", (e) => {
-  paletteEditor.updateColor(
-    e.detail.paletteIdx,
-    e.detail.colorIdx,
-    e.detail.r,
-    e.detail.g,
-    e.detail.b,
+  // Get View elements
+  const tileCanvas = document.getElementById("tile-canvas");
+  const paletteEditor = document.getElementById("palette");
+  const colorPicker = document.getElementById("color-picker");
+  const toolPanel = document.getElementById("tools");
+
+  // Create Controllers (wire up Views and Models)
+  const tileController = new TileEditorController(
+    tileModel,
+    paletteModel,
+    editorState,
+    tileCanvas
   );
-  tileCanvas.redraw();
-});
 
-toolPanel.addEventListener("tool-selected", (e) => {
-  console.log("Tool selected:", e.detail.tool);
-});
+  const paletteController = new PaletteController(
+    paletteModel,
+    paletteEditor,
+    colorPicker
+  );
 
-// File operations
-document.getElementById("save-file").addEventListener("click", () => {
-  // Export project data
-  const data = {
-    tile: tileCanvas.editor.export_planar(),
-    palette: paletteEditor.exportPalette(),
-  };
-  // Save to IndexedDB or download
-});
+  const fileController = new FileController(
+    tileModel,
+    paletteModel
+  );
+
+  // Wire up tool panel to editor state
+  toolPanel.addEventListener("tool-selected", (e) => {
+    editorState.setTool(e.detail.tool);
+  });
+
+  toolPanel.addEventListener("zoom-changed", (e) => {
+    editorState.setZoom(e.detail.zoom);
+  });
+
+  toolPanel.addEventListener("grid-toggled", (e) => {
+    editorState.setGridEnabled(e.detail.enabled);
+  });
+
+  // Wire up file operations
+  document.getElementById("save-file").addEventListener("click", () => {
+    fileController.saveProject();
+  });
+
+  document.getElementById("export").addEventListener("click", () => {
+    fileController.exportBinary();
+  });
+
+  document.getElementById("open-file").addEventListener("click", () => {
+    fileController.openProject();
+  });
+
+  // Global undo/redo shortcuts
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === "z") {
+        e.preventDefault();
+        tileController.undo();
+      } else if (e.key === "y") {
+        e.preventDefault();
+        tileController.redo();
+      }
+    }
+  });
+}
+
+main();
 ```
 
 ### Usage in React (Future Semikit Website)
@@ -1091,13 +1467,16 @@ This section outlines the step-by-step implementation strategy for building semi
 - Set up build script for WASM compilation
 - Create output directory structure
 
-#### 2.2 - TileEditor WASM Bindings
+#### 2.2 - WASM Bindings for Core Types
 
-- Implement `TileEditor` struct in `web/src/lib.rs`
-- Expose pixel manipulation methods: `set_pixel()`, `get_pixel()`
-- Expose tile import/export: `export_planar()`, `import_planar()`
-- Expose color methods: `get_color_rgb()`, `set_color()`
-- Expose palette methods: `export_palette()`, `import_palette()`
+- Expose `Tile` struct in `web/src/lib.rs`
+  - Methods: `new()`, `set_pixel()`, `get_pixel()`, `to_planar()`, `from_planar()`
+- Expose `Color` struct
+  - Methods: `new()`, `from_rgb888()`, `to_rgb888()`, `from_rgb555()`, `to_rgb555()`
+- Expose `Palette` struct
+  - Methods: `new()`, `get_color()`, `set_color()`, `export_binary()`, `import_binary()`
+- Expose `Tilemap` and `TilemapEntry` structs
+  - Methods: `new()`, `get_entry()`, `set_entry()`, `export_binary()`
 - Set up panic hook for better debugging in browser
 
 #### 2.3 - WASM Module Building & Testing
@@ -1107,7 +1486,7 @@ This section outlines the step-by-step implementation strategy for building semi
 - Test all exposed methods from JavaScript console
 - Verify memory management (no leaks with repeated calls)
 
-**Deliverable:** Working WASM module with JavaScript API
+**Deliverable:** Working WASM module with direct access to Rust types
 
 ---
 
@@ -1137,237 +1516,320 @@ This section outlines the step-by-step implementation strategy for building semi
 
 - Create `ui/src/lib/wasm-loader.ts`
 - Implement async WASM module initialization
-- Export singleton instance for components to use
+- Export WASM types for use in Models
 - Add error handling for WASM load failures
 
 **Deliverable:** UI build system with design tokens and WASM loader
 
 ---
 
-### Stage 4: TileCanvas Component (MVP)
+### Stage 4: Model Layer (Observable State)
 
-**Goal:** Create the first working component - the tile editing canvas
+**Goal:** Create observable Model classes that wrap WASM functionality
 
 **Tasks:**
 
-#### 4.1 - TileCanvas Web Component Structure
+#### 4.1 - EventEmitter Base Class
 
-- Create `ui/src/components/TileCanvas/` directory
-- Implement basic Web Component class structure
-- Set up Shadow DOM
-- Implement `connectedCallback()` lifecycle
+- Create `ui/src/models/EventEmitter.ts`
+- Implement `on()`, `off()`, `emit()` methods
+- Support multiple listeners per event
+- Proper cleanup in `off()`
 
-#### 4.2 - Canvas Setup & Rendering
+#### 4.2 - TileModel
 
-- Create canvas element in Shadow DOM
-- Initialize 2D rendering context
-- Implement `redraw()` method to render tile from WASM
-- Implement pixel-perfect rendering at configurable zoom
-- Add image-rendering CSS for crisp pixels
+- Create `ui/src/models/TileModel.ts`
+- Wrap WASM `Tile` instance
+- Implement getters: `getPixel(x, y)`
+- Implement setters that emit events: `setPixel(x, y, color)`
+- Implement `importPlanar()`, `exportPlanar()`, `clear()`
+- Emit events: `pixelChanged`, `tileImported`, `tileCleared`
 
-#### 4.3 - Grid Overlay
+#### 4.3 - PaletteModel
 
-- Implement `drawGrid()` method
-- Make grid toggleable via attribute
-- Style grid with semi-transparent lines
+- Create `ui/src/models/PaletteModel.ts`
+- Wrap WASM `Palette` instance
+- Track active sub-palette and selected color
+- Implement `getColor()`, `setColor()`, `selectColor()`, `setActiveSubPalette()`
+- Implement `importBinary()`, `exportBinary()`
+- Emit events: `colorChanged`, `colorSelected`, `subPaletteChanged`, `paletteImported`
 
-#### 4.4 - Mouse Interaction
+#### 4.4 - EditorState
 
-- Implement mouse event listeners (mousedown, mousemove, mouseup)
-- Convert mouse coordinates to tile pixel coordinates
-- Implement basic pencil drawing tool
-- Add drawing state management (isDrawing flag)
+- Create `ui/src/models/EditorState.ts`
+- Define `Tool` enum (Pencil, Fill, Line, Rectangle)
+- Track current tool, zoom level, grid enabled
+- Implement setters that emit events
+- Emit events: `toolChanged`, `zoomChanged`, `gridToggled`
 
-#### 4.5 - Component Attributes & Events
+#### 4.5 - Model Testing
 
-- Implement `observedAttributes` for reactive updates
-- Add `zoom`, `grid`, `active-palette` attributes
-- Dispatch custom `pixel-changed` event
-- Add component styles in `TileCanvas.css`
+- Create simple HTML page to test Models
+- Verify events are emitted correctly
+- Test Model state changes
+- Verify WASM integration works
 
-**Deliverable:** Working tile canvas where users can draw with a pencil tool
+**Deliverable:** Complete Model layer with observable state management
 
 ---
 
-### Stage 5: PaletteEditor Component
+### Stage 5: TileCanvas View Component (MVP)
 
-**Goal:** Allow users to view and select colors from a palette
+**Goal:** Create the first working View component - pure presentation only
 
 **Tasks:**
 
-#### 5.1 - PaletteEditor Structure
+#### 5.1 - TileCanvas Web Component Structure
 
-- Create `ui/src/components/PaletteEditor/` directory
+- Create `ui/src/views/TileCanvas/` directory
+- Implement basic Web Component class structure
+- Set up Shadow DOM
+- Implement `connectedCallback()` and `disconnectedCallback()` lifecycle
+
+#### 5.2 - Model Dependency Injection
+
+- Add `setModels()` method to inject TileModel, PaletteModel, EditorState
+- Subscribe to Model events in `setModels()`
+- Unsubscribe from Model events in `disconnectedCallback()`
+- Store Model references as private properties
+
+#### 5.3 - Canvas Setup & Pure Rendering
+
+- Create canvas element in Shadow DOM
+- Initialize 2D rendering context
+- Implement `redraw()` method that reads from Models only (no state)
+- Render pixels using TileModel.getPixel() and PaletteModel.getColor()
+- Use EditorState.getZoom() for zoom level
+- Add image-rendering CSS for crisp pixels
+
+#### 5.4 - Grid Overlay
+
+- Implement `drawGrid()` method
+- Read grid enabled state from EditorState.isGridEnabled()
+- Style grid with semi-transparent lines
+
+#### 5.5 - Mouse Event Dispatching
+
+- Implement mouse event listeners (mousedown, mousemove, mouseup)
+- Convert mouse coordinates to tile pixel coordinates
+- Dispatch custom events (`draw-start`, `draw-move`, `draw-end`) with coordinates
+- DO NOT modify Models directly - only dispatch events
+
+#### 5.6 - Component Styling
+
+- Add component styles in `TileCanvas.css`
+- Style canvas container
+- Add hover effects
+
+**Deliverable:** Pure View component that renders tile state and dispatches interaction events
+
+---
+
+### Stage 6: TileEditorController
+
+**Goal:** Create Controller to handle tile editing logic
+
+**Tasks:**
+
+#### 6.1 - TileEditorController Class
+
+- Create `ui/src/controllers/TileEditorController.ts`
+- Accept TileModel, PaletteModel, EditorState, and TileCanvas view in constructor
+- Inject Models into View via `view.setModels()`
+
+#### 6.2 - Event Handling
+
+- Listen to View's `draw-start`, `draw-move`, `draw-end` events
+- Track drawing state (isDrawing flag)
+- Get selected color from PaletteModel
+- Update TileModel based on active tool from EditorState
+
+#### 6.3 - Tool Logic
+
+- Implement pencil tool (direct pixel setting)
+- Implement fill tool (flood fill algorithm)
+- Implement line tool (Bresenham's line algorithm)
+- Implement rectangle tool (filled and outline)
+
+#### 6.4 - Public API
+
+- Expose methods: `clear()`, `undo()`, `redo()`
+- Methods update Models, which trigger View re-renders via events
+
+**Deliverable:** Working tile editor with Controller coordinating View and Models
+
+---
+
+### Stage 7: PaletteEditor View & Controller
+
+**Goal:** Create palette viewing/editing with View and Controller
+
+**Tasks:**
+
+#### 7.1 - PaletteEditor View Component
+
+- Create `ui/src/views/PaletteEditor/` directory
 - Implement Web Component class
 - Set up Shadow DOM with grid layout
+- Add `setModel(paletteModel)` method for dependency injection
+- Subscribe to PaletteModel events: `colorChanged`, `colorSelected`, `subPaletteChanged`
 
-#### 5.2 - Palette Grid Rendering
+#### 7.2 - Palette Grid Rendering (Pure View)
 
 - Render 16 color swatches for active sub-palette
-- Display colors using data from WASM
-- Highlight selected color
+- Read colors from PaletteModel.getColor()
+- Highlight selected color from PaletteModel.getSelectedColorIndex()
 - Show color index numbers
+- Re-render when Model emits events
 
-#### 5.3 - Color Selection
+#### 7.3 - User Interaction Events
 
 - Implement click handlers for color swatches
-- Track selected color index
-- Dispatch `color-selected` custom event
-- Update visual selection indicator
+- Dispatch custom events (`color-select-clicked`) with color index
+- DO NOT modify Model directly - only dispatch events
 
-#### 5.4 - Sub-Palette Switching
+#### 7.4 - Sub-Palette Selector
 
-- Add sub-palette selector dropdown (0-15)
-- Update displayed colors when sub-palette changes
-- Persist selected sub-palette
+- Add sub-palette dropdown (0-15)
+- Read active sub-palette from PaletteModel
+- Dispatch `subpalette-change-clicked` event on selection
 
-#### 5.5 - Styling
+#### 7.5 - Styling
 
 - Create `PaletteEditor.css` with grid layout
 - Style color swatches with borders and hover effects
 - Add selection highlighting
 - Add transparency indicator for color index 0
 
-**Deliverable:** Palette viewer with color selection
+#### 7.6 - PaletteController
+
+- Create `ui/src/controllers/PaletteController.ts`
+- Listen to View's `color-select-clicked` event
+- Update PaletteModel.selectColor() when user clicks color
+- Listen to `subpalette-change-clicked` and update PaletteModel
+
+**Deliverable:** Palette viewer with MVC separation
 
 ---
 
-### Stage 6: ColorPicker Component
+### Stage 8: ColorPicker View Component
 
 **Goal:** Allow users to edit individual colors in RGB555 format
 
 **Tasks:**
 
-#### 6.1 - ColorPicker Structure
+#### 8.1 - ColorPicker View Structure
 
-- Create `ui/src/components/ColorPicker/` directory
+- Create `ui/src/views/ColorPicker/` directory
 - Implement Web Component class
 - Set up Shadow DOM with form layout
+- Add `setModel(paletteModel)` method for dependency injection
+- Subscribe to PaletteModel events: `colorSelected`, `colorChanged`
 
-#### 6.2 - RGB555 Sliders
+#### 8.2 - RGB555 Sliders (Pure View)
 
 - Create three range inputs for R, G, B (0-31 range)
 - Display current color value as RGB555 hex
 - Show live color preview swatch
 - Display 8-bit RGB values for reference
+- Load current color from PaletteModel when selection changes
 
-#### 6.3 - Color Editing
+#### 8.3 - Color Editing Events
 
-- Load current color when selection changes
-- Update WASM palette when sliders change
-- Dispatch `color-changed` custom event
+- Dispatch `color-edit` custom event when sliders change
+- Include { paletteIdx, colorIdx, r, g, b } in event detail
+- DO NOT modify Model directly - Controller will handle it
 - Debounce slider updates for performance
 
-#### 6.4 - Hex Input (Optional)
+#### 8.4 - Hex Input (Optional)
 
 - Add text input for direct RGB555 hex entry
 - Validate hex input format
-- Update sliders from hex input
+- Dispatch `color-edit` event with parsed hex values
 
-#### 6.5 - Styling
+#### 8.5 - Styling
 
 - Create `ColorPicker.css`
 - Style sliders with custom track colors
 - Add color preview swatch
 - Show value labels
 
-**Deliverable:** Functional RGB555 color editor
+#### 8.6 - Controller Integration
+
+- PaletteController (from Stage 7) listens to `color-edit` event
+- Controller calls PaletteModel.setColor() with new values
+- Model emits `colorChanged` event
+- All Views observing PaletteModel update automatically
+
+**Deliverable:** Functional RGB555 color editor with MVC separation
 
 ---
 
-### Stage 7: Standalone App Integration
+### Stage 9: Standalone App Integration (MVC Wiring)
 
-**Goal:** Wire up components into a working standalone application
+**Goal:** Wire up Models, Views, and Controllers into a working application
 
 **Tasks:**
 
-#### 7.1 - HTML Structure
+#### 9.1 - HTML Structure
 
 - Create `ui/src/standalone/index.html`
 - Set up semantic HTML structure (header, main, aside)
-- Create layout grid for component placement
+- Create layout grid for View placement
 - Add navigation buttons (New, Save, Export)
 
-#### 7.2 - Component Integration
+#### 9.2 - MVC Bootstrap
 
 - Create `ui/src/standalone/app.ts`
-- Import all Web Components
-- Initialize component instances
-- Wire up event listeners between components
+- Import all View components
+- Initialize WASM and create Models (TileModel, PaletteModel, EditorState)
+- Get View element references from DOM
+- Create Controllers and pass Models + Views to them
 
-#### 7.3 - Component Communication
+#### 9.3 - Controller Wiring
 
-- Connect TileCanvas ↔ PaletteEditor (color selection)
-- Connect PaletteEditor ↔ ColorPicker (color editing)
-- Connect ColorPicker → TileCanvas (trigger redraw on color change)
-- Implement shared state management
+- Instantiate TileEditorController with TileModel, PaletteModel, EditorState, TileCanvas
+- Instantiate PaletteController with PaletteModel, PaletteEditor, ColorPicker
+- Controllers automatically wire up Views to Models
+- Models emit events → Views update automatically
 
-#### 7.4 - Layout & Styling
+#### 9.4 - Tool Panel Integration
+
+- Add ToolPanel View component
+- Wire up tool selection to EditorState.setTool()
+- Wire up zoom changes to EditorState.setZoom()
+- Wire up grid toggle to EditorState.setGridEnabled()
+
+#### 9.5 - Layout & Styling
 
 - Create `ui/src/standalone/styles.css`
 - Implement responsive layout
 - Style header and navigation
-- Add panel styling for component containers
+- Add panel styling for View containers
 
-#### 7.5 - WASM Integration
+#### 9.6 - Loading State
 
-- Initialize WASM module on page load
-- Pass WASM instance to all components
-- Add loading state while WASM initializes
+- Add loading screen while WASM initializes
 - Handle WASM initialization errors
+- Show error messages if Models fail to initialize
 
-**Deliverable:** Working standalone tile editor with all core features
-
----
-
-### Stage 8: ToolPanel & Drawing Tools
-
-**Goal:** Add additional drawing tools beyond basic pencil
-
-**Tasks:**
-
-#### 8.1 - ToolPanel Component
-
-- Create `ui/src/components/ToolPanel/` directory
-- Implement Web Component class
-- Add tool selection buttons (Pencil, Fill, Line, Rectangle)
-- Dispatch `tool-selected` event
-
-#### 8.2 - Fill Tool
-
-- Implement flood fill algorithm
-- Add fill tool to TileCanvas
-- Handle fill on mouse click
-
-#### 8.3 - Line Tool
-
-- Implement Bresenham's line algorithm
-- Add line drawing mode to TileCanvas
-- Show preview line while dragging
-
-#### 8.4 - Rectangle Tool
-
-- Implement rectangle drawing (filled and outline)
-- Add mode toggle for filled vs outline
-- Show preview rectangle while dragging
-
-#### 8.5 - Tool Options
-
-- Add tool-specific options (e.g., filled vs outline for rectangle)
-- Add grid toggle checkbox
-- Add zoom slider
-
-**Deliverable:** Complete drawing toolset
+**Deliverable:** Working standalone tile editor with full MVC architecture
 
 ---
 
-### Stage 9: File Operations & Export
+### Stage 10: File Operations & Export (FileController)
 
-**Goal:** Enable saving, loading, and exporting work
+**Goal:** Enable saving, loading, and exporting work with FileController
 
 **Tasks:**
 
-#### 9.1 - Export Manager Utility
+#### 10.1 - FileController Class
+
+- Create `ui/src/controllers/FileController.ts`
+- Accept TileModel and PaletteModel in constructor
+- Implement file operations that read from / write to Models
+
+#### 10.2 - Export Manager Utility
 
 - Create `ui/src/lib/ExportManager.ts` class
 - Implement binary tile data export (.bin)
@@ -1375,242 +1837,315 @@ This section outlines the step-by-step implementation strategy for building semi
 - Implement C header generation
 - Implement Assembly header generation
 
-#### 9.2 - File Download
+#### 10.3 - File Download
 
+- FileController.exportBinary() reads from Models and triggers downloads
+- FileController.exportCHeader() generates C headers
 - Implement browser file download functionality
-- Add download buttons to UI
 - Generate appropriate filenames with extensions
 
-#### 9.3 - Project Format
+#### 10.4 - Project Format
 
 - Define JSON-based project file format
   - Tile data (planar format base64 encoded)
   - Palette data (RGB555 values)
   - Metadata (name, version, etc.)
-- Implement project serialization/deserialization
+- FileController.saveProject() serializes Models to JSON
+- FileController.loadProject() deserializes JSON to Models
 
-#### 9.4 - IndexedDB Storage
+#### 10.5 - IndexedDB Storage
 
 - Create `ui/src/lib/storage.ts` wrapper
-- Implement auto-save to IndexedDB
-- Add save/load UI
-- Show list of saved projects
+- FileController.autoSave() periodically saves to IndexedDB
+- FileController.listProjects() returns saved project list
+- Show list of saved projects in UI
 
-#### 9.5 - File Import
+#### 10.6 - File Import
 
-- Add file input for loading projects
+- FileController.openProject() opens file picker
 - Parse and validate project files
-- Load tile and palette data into WASM
-- Trigger component updates
+- Load tile and palette data into Models
+- Models emit events → all Views update automatically
 
-**Deliverable:** Complete file management system
+**Deliverable:** Complete file management system with MVC separation
 
 ---
 
-### Stage 10: Tile Bank
+### Stage 11: Command History & Undo/Redo
 
-**Goal:** Manage multiple tiles instead of just one
+**Goal:** Implement command pattern for undo/redo functionality
 
 **Tasks:**
 
-#### 10.1 - Tile Bank Data Structure
+#### 11.1 - Command Interface
 
-- Extend WASM bindings to support multiple tiles
-- Implement tile array/vector in TileEditor
-- Add methods: `add_tile()`, `delete_tile()`, `get_tile()`, `set_active_tile()`
+- Create `ui/src/models/CommandHistory.ts`
+- Define `Command` interface with `execute()` and `undo()` methods
+- Implement command stack (undo stack and redo stack)
 
-#### 10.2 - Tile Bank UI Component
+#### 11.2 - Tile Commands
 
-- Create mini-grid of tile thumbnails
-- Implement tile selection
-- Add new/delete tile buttons
-- Show active tile indicator
+- Implement `SetPixelCommand` with execute/undo
+- Implement `FillCommand` with execute/undo
+- Implement `ClearTileCommand` with execute/undo
 
-#### 10.3 - Tile Operations
+#### 11.3 - Palette Commands
 
-- Implement copy/paste tiles
+- Implement `SetColorCommand` with execute/undo
+- Implement `ImportPaletteCommand` with execute/undo
+
+#### 11.4 - Controller Integration
+
+- TileEditorController wraps Model mutations in Commands
+- Execute command → add to history → command calls Model methods
+- Model emits events → Views update
+- Implement undo() and redo() in Controllers
+
+#### 11.5 - Keyboard Shortcuts
+
+- Wire up Ctrl+Z for undo
+- Wire up Ctrl+Y / Ctrl+Shift+Z for redo
+- Add undo/redo buttons to UI
+
+**Deliverable:** Full undo/redo system integrated with MVC architecture
+
+---
+
+### Stage 12: Tile Bank (Multi-Tile Model)
+
+**Goal:** Extend TileModel to manage multiple tiles
+
+**Tasks:**
+
+#### 12.1 - TileBankModel
+
+- Create `ui/src/models/TileBankModel.ts`
+- Manage array of WASM `Tile` instances
+- Track active tile index
+- Implement methods: `addTile()`, `deleteTile()`, `setActiveTile()`, `getTile(index)`
+- Emit events: `tileAdded`, `tileDeleted`, `activeTileChanged`
+
+#### 12.2 - Tile Bank View Component
+
+- Create `ui/src/views/TileBank/TileBank.ts`
+- Render mini-grid of tile thumbnails
+- Read tiles from TileBankModel
+- Listen to Model events and re-render
+- Dispatch `tile-select-clicked` event
+
+#### 12.3 - TileBankController
+
+- Create `ui/src/controllers/TileBankController.ts`
+- Wire TileBankModel to TileBank View
+- Handle tile selection → update TileBankModel.setActiveTile()
+- Handle add/delete buttons → update TileBankModel
+
+#### 12.4 - Integration with TileEditorController
+
+- TileEditorController now works with TileBankModel.getActiveTile()
+- When active tile changes, TileCanvas re-renders
+- All editing operations apply to active tile
+
+#### 12.5 - Tile Operations
+
+- Implement copy/paste tiles (commands for undo/redo)
 - Implement duplicate tile
 - Implement clear tile
-- Add tile reordering (drag & drop)
+- Add tile reordering (drag & drop with command pattern)
 
-#### 10.4 - Tile Bank Integration
+#### 12.6 - File Operations Update
 
-- Update TileCanvas to work with active tile from bank
-- Update file operations to save/load all tiles
+- FileController saves/loads all tiles from TileBankModel
 - Export all tiles in batch
 
-**Deliverable:** Multi-tile editing capability
+**Deliverable:** Multi-tile editing with MVC architecture
 
 ---
 
-### Stage 11: TilemapEditor Component
+### Stage 13: Tilemap Editor (Model-View-Controller)
 
-**Goal:** Arrange tiles into tilemaps
+**Goal:** Arrange tiles into tilemaps with MVC architecture
 
 **Tasks:**
 
-#### 11.1 - TilemapEditor Component Structure
+#### 13.1 - TilemapModel
 
-- Create `ui/src/components/TilemapEditor/` directory
-- Implement Web Component class
-- Create canvas for tilemap display
+- Create `ui/src/models/TilemapModel.ts`
+- Wrap WASM `Tilemap` instance
+- Track tilemap dimensions, entries
+- Implement methods: `getEntry()`, `setEntry()`, `resize()`
+- Emit events: `entryChanged`, `tilemapResized`
 
-#### 11.2 - Tilemap Rendering
+#### 13.2 - TilemapEditor View
 
-- Render grid of tiles from Tile Bank
+- Create `ui/src/views/TilemapEditor/TilemapEditor.ts`
+- Render grid of tiles from TileBankModel
+- Listen to TilemapModel and TileBankModel events
 - Implement scrolling/panning
 - Show tile boundaries
-- Render with proper palette per tile
+- Dispatch `tile-place-clicked` event
 
-#### 11.3 - Tile Placement
+#### 13.3 - TilemapController
 
-- Implement tile selection from bank
-- Place tiles on click
-- Show tile preview while hovering
+- Create `ui/src/controllers/TilemapController.ts`
+- Handle tile placement from View events
+- Update TilemapModel.setEntry() with selected tile
+- Handle tile attribute changes (flip, palette, priority)
 
-#### 11.4 - Tile Attributes
+#### 13.4 - Tile Attributes Panel View
 
-- Add attribute editing panel
-- Implement H-Flip toggle
-- Implement V-Flip toggle
-- Implement palette selection (0-7)
-- Implement priority toggle
+- Add attribute editing panel component
+- Display attributes for selected tilemap entry
+- Dispatch events for H-Flip, V-Flip, palette, priority changes
 
-#### 11.5 - Tilemap Export
+#### 13.5 - Tilemap Export
 
-- Export tilemap as binary data
+- FileController exports tilemap via TilemapModel.exportBinary()
 - Export as C/Assembly arrays
 - Include tilemap dimensions in export
 
-**Deliverable:** Complete tilemap editor
+**Deliverable:** Complete tilemap editor with MVC separation
 
 ---
 
-### Stage 12: Advanced Features & Polish
+### Stage 14: Advanced Features & Polish
 
 **Goal:** Add quality-of-life features and polish
 
 **Tasks:**
 
-#### 12.1 - Undo/Redo System
-
-- Implement command pattern for actions
-- Add undo/redo stack
-- Wire up keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-
-#### 12.2 - Keyboard Shortcuts
+#### 14.1 - Keyboard Shortcuts
 
 - Add keyboard navigation
 - Implement tool hotkeys (P=Pencil, F=Fill, etc.)
 - Add color selection shortcuts (0-9 for first 10 colors)
+- EditorState tracks shortcuts and emits events
 
-#### 12.3 - PNG Import/Export
+#### 14.2 - PNG Import/Export
 
 - Implement PNG import with palette quantization
 - Implement PNG export of current tile
 - Support batch PNG export of tile bank
+- FileController handles PNG operations
 
-#### 12.4 - UI Polish
+#### 14.3 - UI Polish
 
 - Add tooltips to all buttons and controls
-- Improve loading states
+- Improve loading states in Views
 - Add error messages for invalid operations
 - Improve responsive layout for different screen sizes
 
-#### 12.5 - Testing & Bug Fixes
+#### 14.4 - Testing & Bug Fixes
 
-- Test all features end-to-end
+- Test MVC data flow end-to-end
+- Test all Model events trigger View updates correctly
 - Fix rendering bugs
 - Optimize performance
 - Test on different browsers
 
-**Deliverable:** Polished, production-ready standalone app
+**Deliverable:** Polished, production-ready standalone app with MVC architecture
 
 ---
 
-### Stage 13: React Wrappers
+### Stage 15: React Wrappers
 
 **Goal:** Create React components for semikit website integration
 
 **Tasks:**
 
-#### 13.1 - React Wrapper Components
+#### 15.1 - React Hooks for Models
+
+- Create custom React hooks for Models
+  - `useTileModel()` - returns TileModel with state synchronization
+  - `usePaletteModel()` - returns PaletteModel
+  - `useEditorState()` - returns EditorState
+- Hooks use `useState` + Model events to trigger re-renders
+
+#### 15.2 - React Wrapper Components
 
 - Create `ui/src/react/TileCanvasReact.tsx`
 - Create `ui/src/react/PaletteEditorReact.tsx`
 - Create `ui/src/react/ColorPickerReact.tsx`
 - Create `ui/src/react/ToolPanelReact.tsx`
 - Create `ui/src/react/TilemapEditorReact.tsx`
+- Wrappers use hooks to access Models and pass to View components
 
-#### 13.2 - React Integration Patterns
+#### 15.3 - React MVC Integration
 
-- Implement proper useEffect cleanup
-- Handle ref management for Web Components
-- Implement prop → attribute synchronization
-- Convert custom events to React callbacks
+- React components can use Models directly via hooks
+- Controllers can be instantiated in React components
+- Views remain Web Components (wrapped for React)
 
-#### 13.3 - React Example Page
+#### 15.4 - React Example Page
 
-- Create example React app demonstrating usage
+- Create example React app demonstrating MVC usage
+- Show how to create Models, Controllers in React
 - Document all component props
 - Show event handling patterns
 
-#### 13.4 - TypeScript Definitions
+#### 15.5 - TypeScript Definitions
 
 - Create `.d.ts` files for all components
 - Type all props and events
-- Document component APIs
+- Type all Models and Controllers
+- Document APIs
 
-**Deliverable:** React-ready component library
+**Deliverable:** React-ready component library with MVC support
 
 ---
 
-### Stage 14: Documentation & Publishing
+### Stage 16: Documentation & Publishing
 
 **Goal:** Prepare for public release and npm publishing
 
 **Tasks:**
 
-#### 14.1 - Documentation
+#### 16.1 - Documentation
 
 - Write comprehensive README
-- Document all Web Components (attributes, events, methods)
-- Document React wrappers
-- Create usage examples
+- Document MVC architecture (Models, Views, Controllers)
+- Document all Models (TileModel, PaletteModel, EditorState, etc.)
+- Document all Views (Web Components with attributes, events, methods)
+- Document all Controllers
+- Document React wrappers and hooks
+- Create usage examples for vanilla JS and React
 - Write integration guide for semikit website
 
-#### 14.2 - API Documentation
+#### 16.2 - API Documentation
 
 - Document WASM API
+- Document Model APIs
 - Document export formats
 - Document file formats
 - Create Cicada-16 integration guide
 
-#### 14.3 - Build & Package
+#### 16.3 - Build & Package
 
 - Configure production build
 - Optimize WASM size
 - Minify TypeScript/CSS
 - Generate source maps
+- Bundle Models, Views, Controllers separately for tree-shaking
 
-#### 14.4 - NPM Publishing
+#### 16.4 - NPM Publishing
 
 - Finalize `package.json` metadata
 - Create `.npmignore`
 - Publish to npm as `semitile-ui`
 - Verify package installation and imports
+- Test MVC architecture works after npm install
 
-#### 14.5 - Demo Deployment
+#### 16.5 - Demo Deployment
 
 - Deploy standalone app to GitHub Pages or Netlify
 - Create public demo URL
 - Add demo to semikit website
 
-**Deliverable:** Published npm package and public demo
+**Deliverable:** Published npm package with MVC architecture and public demo
 
 ---
 
-### Stage 15: Future Iterations
+### Stage 17: Future Iterations
 
 **Goal:** Continue improving based on user feedback
 
@@ -1631,17 +2166,35 @@ This section outlines the step-by-step implementation strategy for building semi
 
 ### Development Order Rationale
 
-1. **Core → WASM → UI**: Building from the inside out ensures a solid foundation
-2. **MVP First**: TileCanvas + PaletteEditor + ColorPicker = minimum viable product
-3. **Iterative**: Each stage produces a working artifact
-4. **Testable**: Each component can be tested independently
+1. **Core → WASM → Models → Views → Controllers**: Building from the inside out ensures a solid foundation
+2. **MVC First**: Establish Model layer before Views to ensure proper separation of concerns
+3. **MVP First**: TileCanvas View + TileEditorController + Models = minimum viable product
+4. **Iterative**: Each stage produces a working artifact
+5. **Testable**: Models, Views, and Controllers can be tested independently
+
+### MVC Architecture Benefits
+
+1. **Single Source of Truth**: Models hold all state, preventing inconsistencies
+2. **Automatic View Updates**: Models emit events → all Views update automatically
+3. **Easy Undo/Redo**: Command pattern integrates naturally with MVC
+4. **Testable Business Logic**: Controllers can be unit tested without DOM
+5. **Multiple Views of Same Data**: Palette can be displayed in multiple places
+6. **Framework Flexibility**: Models and Controllers are framework-agnostic
+7. **Easier Debugging**: Clear data flow makes bugs easier to trace
+8. **Future-Proof**: Adding new Views or Controllers doesn't require changing Models
 
 ### Testing Strategy
 
-- **Unit Tests**: Rust core (planar conversion, color conversion, packing)
-- **Integration Tests**: WASM bindings (JavaScript ↔ Rust)
-- **Manual Testing**: Web Components (visual and interaction)
-- **E2E Testing**: Standalone app (full workflow)
+- **Unit Tests**:
+  - Rust core (planar conversion, color conversion, packing)
+  - Models (event emission, state management)
+  - Controllers (business logic, command execution)
+- **Integration Tests**:
+  - WASM bindings (JavaScript ↔ Rust)
+  - Model → View event flow
+  - View → Controller → Model interaction
+- **Manual Testing**: Views (visual rendering and user interaction)
+- **E2E Testing**: Full MVC workflow in standalone app
 
 ### Performance Considerations
 
