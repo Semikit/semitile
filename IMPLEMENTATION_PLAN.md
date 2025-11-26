@@ -32,7 +32,7 @@ The UI is designed as a **modular, reusable component system** that can:
 ```
 semitile/
 ├── Cargo.toml                           # Rust workspace
-├── core/                                # Pure Rust logic (WASM target)
+├── semitile_core/                       # Pure Rust logic (WASM target)
 │   ├── src/
 │   │   ├── lib.rs
 │   │   ├── tile.rs                     # Tile data structures
@@ -481,7 +481,7 @@ All components use these tokens, ensuring visual consistency across standalone a
 ### Tile Representation
 
 ```rust
-// core/src/tile.rs
+// semitile_core/src/tile.rs
 pub struct Tile {
     pixels: [[u8; 8]; 8],  // 4-bit color indices (0-15)
 }
@@ -559,7 +559,7 @@ impl Default for Tile {
 ### Color and Palette
 
 ```rust
-// core/src/palette.rs
+// semitile_core/src/palette.rs
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color {
     r: u8,  // 0-31 (5 bits)
@@ -675,7 +675,7 @@ impl Default for Palette {
 ### Tilemap
 
 ```rust
-// core/src/tilemap.rs
+// semitile_core/src/tilemap.rs
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TilemapEntry {
     tile_index: u16,    // 10 bits (0-1023)
@@ -1024,8 +1024,8 @@ This section outlines the step-by-step implementation strategy for building semi
 
 **Tasks:**
 
-1. Initialize Rust workspace with `core/` and `web/` crates
-2. Configure `core/` crate for library compilation
+1. Initialize Rust workspace with `semitile_core/` and `web/` crates
+2. Configure `semitile_core/` crate for library compilation
 3. Configure `web/` crate with `wasm-bindgen` and `wasm-pack`
 4. Set up `ui/` directory with `package.json` and Vite build configuration
 5. Create basic project structure (all directories and placeholder files)
@@ -1045,7 +1045,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 1.1 - Tile Implementation
 
-- Implement `Tile` struct in `core/src/tile.rs`
+- Implement `Tile` struct in `semitile_core/src/tile.rs`
 - Implement `new()`, `set_pixel()`, `get_pixel()` methods
 - Implement `to_planar()` conversion (4bpp planar encoding)
 - Implement `from_planar()` conversion (4bpp planar decoding)
@@ -1053,7 +1053,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 1.2 - Color and Palette Implementation
 
-- Implement `Color` struct in `core/src/palette.rs`
+- Implement `Color` struct in `semitile_core/src/palette.rs`
 - Implement RGB555 conversion: `to_rgb555()`, `from_rgb555()`
 - Implement RGB888 conversion: `to_rgb888()`, `from_rgb888()` (for browser display)
 - Implement `Palette` struct with 16 sub-palettes
@@ -1062,7 +1062,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 1.3 - Tilemap Implementation
 
-- Implement `TilemapEntry` struct in `core/src/tilemap.rs`
+- Implement `TilemapEntry` struct in `semitile_core/src/tilemap.rs`
 - Implement `to_u16()` and `from_u16()` for 16-bit packing/unpacking
 - Implement `Tilemap` struct with grid operations
 - Implement `export_binary()` for tilemap data
@@ -1070,7 +1070,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 1.4 - Export Utilities
 
-- Create `core/src/export.rs` for export format generation
+- Create `semitile_core/src/export.rs` for export format generation
 - Implement C header file generation
 - Implement Assembly (.inc) file generation
 - Write unit tests for export formats
