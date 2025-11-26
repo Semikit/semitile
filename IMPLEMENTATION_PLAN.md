@@ -51,46 +51,46 @@ semitile/
     ├── src/
     │   ├── components/                  # Reusable Web Components
     │   │   ├── TileCanvas/
-    │   │   │   ├── TileCanvas.js       # Web Component implementation
+    │   │   │   ├── TileCanvas.ts       # Web Component implementation
     │   │   │   ├── TileCanvas.css      # Component styles
-    │   │   │   └── index.js            # Component exports
+    │   │   │   └── index.ts            # Component exports
     │   │   ├── PaletteEditor/
-    │   │   │   ├── PaletteEditor.js
+    │   │   │   ├── PaletteEditor.ts
     │   │   │   ├── PaletteEditor.css
-    │   │   │   └── index.js
+    │   │   │   └── index.ts
     │   │   ├── ColorPicker/
-    │   │   │   ├── ColorPicker.js      # RGB555 color picker
+    │   │   │   ├── ColorPicker.ts      # RGB555 color picker
     │   │   │   ├── ColorPicker.css
-    │   │   │   └── index.js
+    │   │   │   └── index.ts
     │   │   ├── TilemapEditor/
-    │   │   │   ├── TilemapEditor.js
+    │   │   │   ├── TilemapEditor.ts
     │   │   │   ├── TilemapEditor.css
-    │   │   │   └── index.js
+    │   │   │   └── index.ts
     │   │   └── ToolPanel/
-    │   │       ├── ToolPanel.js
+    │   │       ├── ToolPanel.ts
     │   │       ├── ToolPanel.css
-    │   │       └── index.js
+    │   │       └── index.ts
     │   ├── lib/                         # Utilities (class-based)
-    │   │   ├── wasm-loader.js          # WASM initialization
-    │   │   ├── EditorState.js          # State management
-    │   │   ├── CanvasRenderer.js       # Canvas rendering utilities
-    │   │   ├── ExportManager.js        # Export logic
-    │   │   └── storage.js              # IndexedDB wrapper
+    │   │   ├── wasm-loader.ts          # WASM initialization
+    │   │   ├── EditorState.ts          # State management
+    │   │   ├── CanvasRenderer.ts       # Canvas rendering utilities
+    │   │   ├── ExportManager.ts        # Export logic
+    │   │   └── storage.ts              # IndexedDB wrapper
     │   ├── styles/                      # Shared styles
     │   │   ├── tokens.css              # CSS custom properties
     │   │   ├── reset.css               # CSS reset
     │   │   └── common.css              # Shared component styles
     │   ├── standalone/                  # Standalone web app
     │   │   ├── index.html
-    │   │   ├── app.js                  # Main app logic (vanilla JS)
+    │   │   ├── app.ts                  # Main app logic (vanilla TypeScript)
     │   │   └── styles.css              # App-specific styles
     │   └── react/                       # React wrappers (future)
-    │       ├── TileCanvasReact.jsx
-    │       ├── PaletteEditorReact.jsx
-    │       ├── ColorPickerReact.jsx
-    │       ├── TilemapEditorReact.jsx
-    │       ├── ToolPanelReact.jsx
-    │       └── index.js                # Export all React components
+    │       ├── TileCanvasReact.tsx
+    │       ├── PaletteEditorReact.tsx
+    │       ├── ColorPickerReact.tsx
+    │       ├── TilemapEditorReact.tsx
+    │       ├── ToolPanelReact.tsx
+    │       └── index.ts                # Export all React components
     └── dist/                            # Build output
 ```
 
@@ -114,8 +114,8 @@ semitile/
 
 ### Example: TileCanvas Web Component
 
-```javascript
-// ui/src/components/TileCanvas/TileCanvas.js
+```typescript
+// ui/src/components/TileCanvas/TileCanvas.ts
 class TileCanvas extends HTMLElement {
   constructor() {
     super();
@@ -293,13 +293,13 @@ export default TileCanvas;
       </main>
     </div>
 
-    <script type="module" src="./app.js"></script>
+    <script type="module" src="./app.ts"></script>
   </body>
 </html>
 ```
 
-```javascript
-// ui/src/standalone/app.js
+```typescript
+// ui/src/standalone/app.ts
 import "../components/TileCanvas/TileCanvas.js";
 import "../components/PaletteEditor/PaletteEditor.js";
 import "../components/ColorPicker/ColorPicker.js";
@@ -349,8 +349,8 @@ document.getElementById("save-file").addEventListener("click", () => {
 
 ### Usage in React (Future Semikit Website)
 
-```jsx
-// ui/src/react/TileCanvasReact.jsx
+```tsx
+// ui/src/react/TileCanvasReact.tsx
 import React, { useEffect, useRef } from "react";
 import "../components/TileCanvas/TileCanvas.js";
 
@@ -389,7 +389,7 @@ export function TileCanvas({
 }
 ```
 
-```jsx
+```tsx
 // Example usage in semikit website
 import { TileCanvas, PaletteEditor } from "semitile-ui/react";
 import "semitile-ui/styles/tokens.css";
@@ -1135,7 +1135,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 3.3 - WASM Loader Utility
 
-- Create `ui/src/lib/wasm-loader.js`
+- Create `ui/src/lib/wasm-loader.ts`
 - Implement async WASM module initialization
 - Export singleton instance for components to use
 - Add error handling for WASM load failures
@@ -1290,7 +1290,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 7.2 - Component Integration
 
-- Create `ui/src/standalone/app.js`
+- Create `ui/src/standalone/app.ts`
 - Import all Web Components
 - Initialize component instances
 - Wire up event listeners between components
@@ -1369,7 +1369,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 9.1 - Export Manager Utility
 
-- Create `ui/src/lib/ExportManager.js` class
+- Create `ui/src/lib/ExportManager.ts` class
 - Implement binary tile data export (.bin)
 - Implement binary palette export (.pal)
 - Implement C header generation
@@ -1391,7 +1391,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 9.4 - IndexedDB Storage
 
-- Create `ui/src/lib/storage.js` wrapper
+- Create `ui/src/lib/storage.ts` wrapper
 - Implement auto-save to IndexedDB
 - Add save/load UI
 - Show list of saved projects
@@ -1536,11 +1536,11 @@ This section outlines the step-by-step implementation strategy for building semi
 
 #### 13.1 - React Wrapper Components
 
-- Create `ui/src/react/TileCanvasReact.jsx`
-- Create `ui/src/react/PaletteEditorReact.jsx`
-- Create `ui/src/react/ColorPickerReact.jsx`
-- Create `ui/src/react/ToolPanelReact.jsx`
-- Create `ui/src/react/TilemapEditorReact.jsx`
+- Create `ui/src/react/TileCanvasReact.tsx`
+- Create `ui/src/react/PaletteEditorReact.tsx`
+- Create `ui/src/react/ColorPickerReact.tsx`
+- Create `ui/src/react/ToolPanelReact.tsx`
+- Create `ui/src/react/TilemapEditorReact.tsx`
 
 #### 13.2 - React Integration Patterns
 
@@ -1590,7 +1590,7 @@ This section outlines the step-by-step implementation strategy for building semi
 
 - Configure production build
 - Optimize WASM size
-- Minify JavaScript/CSS
+- Minify TypeScript/CSS
 - Generate source maps
 
 #### 14.4 - NPM Publishing
