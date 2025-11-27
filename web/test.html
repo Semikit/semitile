@@ -1,0 +1,181 @@
+<!--
+Copyright (C) 2025 Connor Nolan connor@cnolandev.com
+
+This file is part of the Semikit project.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semitile WASM Test</title>
+    <style>
+        body {
+            font-family: 'SF Mono', 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #00ff88;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #00ff88;
+        }
+
+        .test-section {
+            background: #16213e;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 3px solid #00ff88;
+        }
+
+        .pass {
+            color: #00ff88;
+        }
+
+        .fail {
+            color: #ff0088;
+        }
+
+        pre {
+            background: #0f3460;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Semitile WASM Module Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import init, {
+            WasmTile,
+            WasmColor,
+            WasmPalette,
+            WasmTilemapEntry,
+            WasmTilemap
+        } from './pkg/web.js';
+
+        const results = document.getElementById('results');
+
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'test-section';
+            div.innerHTML = `<span class="${isError ? 'fail' : 'pass'}">${isError ? '✗' : '✓'}</span> ${message}`;
+            results.appendChild(div);
+        }
+
+        function assert(condition, message) {
+            if (condition) {
+                log(message);
+            } else {
+                log(`FAILED: ${message}`, true);
+                throw new Error(`Assertion failed: ${message}`);
+            }
+        }
+
+        async function runTests() {
+            try {
+                // Initialize WASM
+                await init();
+                log('WASM module initialized successfully');
+
+                // Test Tile
+                const tile = new WasmTile();
+                assert(tile.getPixel(0, 0) === 0, 'New tile has pixel (0,0) = 0');
+
+                tile.setPixel(3, 4, 7);
+                assert(tile.getPixel(3, 4) === 7, 'Set pixel (3,4) to 7');
+                assert(tile.getPixel(0, 0) === 0, 'Other pixels remain 0');
+
+                const planar = tile.toPlanar();
+                assert(planar.length === 32, 'Planar data is 32 bytes');
+
+                const tile2 = WasmTile.fromPlanar(planar);
+                assert(tile2.getPixel(3, 4) === 7, 'Round-trip planar conversion works');
+
+                // Test Color
+                const color = new WasmColor(31, 16, 8);
+                const rgb888 = color.toRgb888();
+                assert(rgb888.length === 3, 'RGB888 returns 3 values');
+                assert(rgb888[0] === 255, 'Red channel expands correctly');
+
+                const rgb555 = color.toRgb555();
+                const color2 = WasmColor.fromRgb555(rgb555);
+                const rgb2 = color2.rgb();
+                assert(rgb2[0] === 31 && rgb2[1] === 16 && rgb2[2] === 8, 'RGB555 round-trip works');
+
+                // Test Palette
+                const palette = new WasmPalette();
+                const testColor = new WasmColor(15, 20, 25);
+                palette.setColor(2, 5, testColor);
+
+                const retrievedColor = palette.getColor(2, 5);
+                const retrievedRgb = retrievedColor.rgb();
+                assert(retrievedRgb[0] === 15 && retrievedRgb[1] === 20 && retrievedRgb[2] === 25,
+                    'Palette set/get color works');
+
+                const paletteBinary = palette.exportBinary();
+                assert(paletteBinary.length === 512, 'Palette exports 512 bytes');
+
+                const palette2 = WasmPalette.importBinary(paletteBinary);
+                assert(palette2 !== null, 'Palette import succeeds');
+
+                // Test TilemapEntry
+                const entry = new WasmTilemapEntry(100, 5, true, false);
+                assert(entry.tileIndex() === 100, 'TilemapEntry tile index is 100');
+                assert(entry.paletteIdx() === 5, 'TilemapEntry palette index is 5');
+                assert(entry.hFlip() === true, 'TilemapEntry h_flip is true');
+                assert(entry.vFlip() === false, 'TilemapEntry v_flip is false');
+
+                const u16Value = entry.toU16();
+                const entry2 = WasmTilemapEntry.fromU16(u16Value);
+                assert(entry2.tileIndex() === 100, 'TilemapEntry round-trip works');
+
+                // Test Tilemap
+                const tilemap = new WasmTilemap(32, 30);
+                assert(tilemap.width() === 32, 'Tilemap width is 32');
+                assert(tilemap.height() === 30, 'Tilemap height is 30');
+
+                const testEntry = new WasmTilemapEntry(42, 3, true, false);
+                tilemap.setEntry(5, 7, testEntry);
+
+                const retrieved = tilemap.getEntry(5, 7);
+                assert(retrieved !== null && retrieved.tileIndex() === 42, 'Tilemap set/get entry works');
+
+                const tilemapBinary = tilemap.exportBinary();
+                assert(tilemapBinary.length === 32 * 30 * 2, 'Tilemap exports correct size');
+
+                const tilemap2 = WasmTilemap.importBinary(tilemapBinary, 32, 30);
+                assert(tilemap2 !== null, 'Tilemap import succeeds');
+                assert(tilemap2.width() === 32 && tilemap2.height() === 30, 'Tilemap dimensions preserved');
+
+                log('<br><strong>All tests passed! ✓</strong>');
+            } catch (error) {
+                log(`<br><strong>Test failed with error:</strong><br><pre>${error.stack}</pre>`, true);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+
+</html>

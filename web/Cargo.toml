@@ -9,3 +9,4 @@ crate-type = ["cdylib", "rlib"]  # cdylib for WASM, rlib for Rust linking
 [dependencies]
 wasm-bindgen = "0.2"
 semitile_core = { path = "../semitile_core" }
+console_error_panic_hook = "0.1"
