@@ -1,0 +1,200 @@
+/*
+ * Copyright (C) 2025 Connor Nolan connor@cnolandev.com
+ *
+ * This file is part of the Semikit project.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* Common component styles */
+
+/* Pixel-perfect rendering for canvases */
+canvas {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Common button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--c16-bg-light);
+  color: var(--c16-text-primary);
+  border: 1px solid var(--c16-primary);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--c16-primary);
+  color: var(--c16-bg-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary button variant */
+.btn-primary {
+  background: var(--c16-primary);
+  color: var(--c16-bg-dark);
+}
+
+.btn-primary:hover {
+  background: var(--c16-primary-dark);
+}
+
+/* Panel styles */
+.panel {
+  background: var(--c16-bg-medium);
+  border: 1px solid var(--c16-bg-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.panel-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--c16-primary);
+  margin-bottom: var(--spacing-md);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Input styles */
+input[type="text"],
+input[type="number"] {
+  background: var(--c16-bg-dark);
+  color: var(--c16-text-primary);
+  border: 1px solid var(--c16-bg-light);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+  outline: none;
+  border-color: var(--c16-primary);
+}
+
+/* Range slider styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--c16-bg-light);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--c16-primary);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--c16-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+/* Checkbox styles */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--c16-bg-dark);
+  border: 1px solid var(--c16-bg-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--c16-primary);
+  border-color: var(--c16-primary);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--c16-bg-dark);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.gap-sm {
+  gap: var(--spacing-sm);
+}
+
+.gap-md {
+  gap: var(--spacing-md);
+}
+
+.gap-lg {
+  gap: var(--spacing-lg);
+}
+
+.text-primary {
+  color: var(--c16-primary);
+}
+
+.text-secondary {
+  color: var(--c16-text-secondary);
+}
+
+.text-muted {
+  color: var(--c16-text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
