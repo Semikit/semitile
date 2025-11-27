@@ -1444,13 +1444,6 @@ This section outlines the step-by-step implementation strategy for building semi
 - Implement `export_binary()` for tilemap data
 - Write unit tests for tilemap entry packing and tilemap operations
 
-#### 1.4 - Export Utilities
-
-- Create `semitile_core/src/export.rs` for export format generation
-- Implement C header file generation
-- Implement Assembly (.inc) file generation
-- Write unit tests for export formats
-
 **Deliverable:** Complete, tested Rust core library with all data structures
 
 ---
