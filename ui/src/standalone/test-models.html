@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Test - Semitile</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #1a1a2e;
+        color: #ffffff;
+        padding: 2rem;
+        line-height: 1.6;
+      }
+
+      h1 {
+        color: #00ff88;
+        border-bottom: 2px solid #00ff88;
+        padding-bottom: 0.5rem;
+      }
+
+      h2 {
+        color: #00d4ff;
+        margin-top: 2rem;
+      }
+
+      .test-section {
+        background: #16213e;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        border: 1px solid #0f3460;
+      }
+
+      .log {
+        background: #0a0a0f;
+        padding: 1rem;
+        border-radius: 4px;
+        font-family: "SF Mono", "Courier New", monospace;
+        font-size: 0.9rem;
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 0.5rem;
+      }
+
+      .log-entry {
+        margin: 0.25rem 0;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #16213e;
+      }
+
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+
+      .success {
+        color: #00ff88;
+      }
+
+      .info {
+        color: #00d4ff;
+      }
+
+      .error {
+        color: #ff0088;
+      }
+
+      button {
+        background: #00ff88;
+        color: #1a1a2e;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        margin: 0.5rem 0.5rem 0.5rem 0;
+        transition: background 0.2s;
+      }
+
+      button:hover {
+        background: #00cc6a;
+      }
+
+      button:disabled {
+        background: #666;
+        cursor: not-allowed;
+      }
+
+      .status {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        font-weight: 600;
+      }
+
+      .status.loading {
+        background: #0f3460;
+        color: #00d4ff;
+      }
+
+      .status.ready {
+        background: #003d2e;
+        color: #00ff88;
+      }
+
+      .status.error {
+        background: #4d0026;
+        color: #ff0088;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Semitile Model Layer Test</h1>
+    <p>
+      This page tests the Model layer (Stage 4) of the Semitile implementation.
+    </p>
+
+    <div id="status" class="status loading">Loading WASM module...</div>
+
+    <div id="test-content" style="display: none">
+      <div class="test-section">
+        <h2>TileModel Tests</h2>
+        <button onclick="testTileModel()">Run TileModel Tests</button>
+        <div id="tile-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>PaletteModel Tests</h2>
+        <button onclick="testPaletteModel()">Run PaletteModel Tests</button>
+        <div id="palette-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>EditorState Tests</h2>
+        <button onclick="testEditorState()">Run EditorState Tests</button>
+        <div id="editor-log" class="log"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>Run All Tests</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initWasm, WasmTile, WasmPalette } from "../lib/wasm-loader.js";
+      import { TileModel } from "../models/TileModel.js";
+      import { PaletteModel } from "../models/PaletteModel.js";
+      import { EditorState, Tool } from "../models/EditorState.js";
+
+      // Initialize WASM and make classes globally available for onclick handlers
+      async function init() {
+        const statusDiv = document.getElementById("status");
+        const testContent = document.getElementById("test-content");
+
+        try {
+          await initWasm();
+          statusDiv.className = "status ready";
+          statusDiv.textContent = "✓ WASM module loaded successfully";
+          testContent.style.display = "block";
+
+          // Make test functions globally available
+          window.testTileModel = testTileModel;
+          window.testPaletteModel = testPaletteModel;
+          window.testEditorState = testEditorState;
+          window.runAllTests = runAllTests;
+
+          console.log("Test page ready");
+        } catch (error) {
+          statusDiv.className = "status error";
+          statusDiv.textContent = `✗ Failed to load WASM: ${error.message}`;
+          console.error("Initialization error:", error);
+        }
+      }
+
+      function log(elementId, message, type = "info") {
+        const logDiv = document.getElementById(elementId);
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+      }
+
+      function clearLog(elementId) {
+        document.getElementById(elementId).innerHTML = "";
+      }
+
+      async function testTileModel() {
+        clearLog("tile-log");
+        log("tile-log", "Starting TileModel tests...", "info");
+
+        try {
+          // Create a new tile
+          const wasmTile = new WasmTile();
+          const tile = new TileModel(wasmTile);
+          log("tile-log", "✓ Created TileModel", "success");
+
+          // Test event emission
+          let eventFired = false;
+          tile.on("pixelChanged", (data) => {
+            eventFired = true;
+            log(
+              "tile-log",
+              `✓ Event fired: pixelChanged at (${data.x}, ${data.y}) -> color ${data.colorIndex}`,
+              "success"
+            );
+          });
+
+          // Test setPixel
+          tile.setPixel(0, 0, 5);
+          if (!eventFired) {
+            log("tile-log", "✗ Event not fired", "error");
+          }
+
+          // Test getPixel
+          const color = tile.getPixel(0, 0);
+          if (color === 5) {
+            log("tile-log", `✓ getPixel returned correct value: ${color}`, "success");
+          } else {
+            log("tile-log", `✗ getPixel returned wrong value: ${color}`, "error");
+          }
+
+          // Test clear
+          tile.on("tileCleared", () => {
+            log("tile-log", "✓ Event fired: tileCleared", "success");
+          });
+          tile.clear();
+
+          const clearedPixel = tile.getPixel(0, 0);
+          if (clearedPixel === 0) {
+            log("tile-log", "✓ Tile cleared successfully", "success");
+          } else {
+            log("tile-log", "✗ Tile not cleared properly", "error");
+          }
+
+          // Test export/import
+          tile.setPixel(3, 3, 7);
+          const exported = tile.exportPlanar();
+          log("tile-log", `✓ Exported planar data: ${exported.length} bytes`, "success");
+
+          const newTile = new TileModel(new WasmTile());
+          newTile.on("tileImported", () => {
+            log("tile-log", "✓ Event fired: tileImported", "success");
+          });
+
+          const imported = newTile.importPlanar(exported);
+          if (imported && newTile.getPixel(3, 3) === 7) {
+            log("tile-log", "✓ Import successful, data preserved", "success");
+          } else {
+            log("tile-log", "✗ Import failed", "error");
+          }
+
+          log("tile-log", "✓ All TileModel tests completed", "success");
+        } catch (error) {
+          log("tile-log", `✗ Error: ${error.message}`, "error");
+        }
+      }
+
+      async function testPaletteModel() {
+        clearLog("palette-log");
+        log("palette-log", "Starting PaletteModel tests...", "info");
+
+        try {
+          // Create a new palette
+          const wasmPalette = new WasmPalette();
+          const palette = new PaletteModel(wasmPalette);
+          log("palette-log", "✓ Created PaletteModel", "success");
+
+          // Test event emission
+          let colorChangedFired = false;
+          palette.on("colorChanged", (data) => {
+            colorChangedFired = true;
+            log(
+              "palette-log",
+              `✓ Event fired: colorChanged [${data.paletteIdx}][${data.colorIdx}] -> RGB(${data.r}, ${data.g}, ${data.b})`,
+              "success"
+            );
+          });
+
+          // Test setColor
+          palette.setColor(0, 1, 255, 0, 0); // Red
+          if (!colorChangedFired) {
+            log("palette-log", "✗ colorChanged event not fired", "error");
+          }
+
+          // Test getColor
+          const color = palette.getColor(0, 1);
+          log(
+            "palette-log",
+            `✓ getColor returned RGB(${color.r}, ${color.g}, ${color.b})`,
+            "success"
+          );
+
+          // Test sub-palette selection
+          let subPaletteChangedFired = false;
+          palette.on("subPaletteChanged", (data) => {
+            subPaletteChangedFired = true;
+            log(
+              "palette-log",
+              `✓ Event fired: subPaletteChanged -> ${data.index}`,
+              "success"
+            );
+          });
+
+          palette.setActiveSubPalette(3);
+          if (!subPaletteChangedFired) {
+            log("palette-log", "✗ subPaletteChanged event not fired", "error");
+          }
+
+          if (palette.getActiveSubPalette() === 3) {
+            log("palette-log", "✓ Active sub-palette set correctly", "success");
+          } else {
+            log("palette-log", "✗ Active sub-palette not set", "error");
+          }
+
+          // Test color selection
+          let colorSelectedFired = false;
+          palette.on("colorSelected", (data) => {
+            colorSelectedFired = true;
+            log(
+              "palette-log",
+              `✓ Event fired: colorSelected -> ${data.colorIndex}`,
+              "success"
+            );
+          });
+
+          palette.selectColor(5);
+          if (!colorSelectedFired) {
+            log("palette-log", "✗ colorSelected event not fired", "error");
+          }
+
+          if (palette.getSelectedColorIndex() === 5) {
+            log("palette-log", "✓ Selected color index set correctly", "success");
+          } else {
+            log("palette-log", "✗ Selected color index not set", "error");
+          }
+
+          // Test export/import
+          const exported = palette.exportBinary();
+          log(
+            "palette-log",
+            `✓ Exported binary data: ${exported.length} bytes`,
+            "success"
+          );
+
+          const newPalette = new PaletteModel(new WasmPalette());
+          newPalette.on("paletteImported", () => {
+            log("palette-log", "✓ Event fired: paletteImported", "success");
+          });
+
+          const imported = newPalette.importBinary(exported);
+          if (imported) {
+            const importedColor = newPalette.getColor(0, 1);
+            log(
+              "palette-log",
+              `✓ Import successful, imported color RGB(${importedColor.r}, ${importedColor.g}, ${importedColor.b})`,
+              "success"
+            );
+          } else {
+            log("palette-log", "✗ Import failed", "error");
+          }
+
+          log("palette-log", "✓ All PaletteModel tests completed", "success");
+        } catch (error) {
+          log("palette-log", `✗ Error: ${error.message}`, "error");
+        }
+      }
+
+      async function testEditorState() {
+        clearLog("editor-log");
+        log("editor-log", "Starting EditorState tests...", "info");
+
+        try {
+          // Create editor state
+          const editorState = new EditorState();
+          log("editor-log", "✓ Created EditorState", "success");
+
+          // Test tool change
+          let toolChangedFired = false;
+          editorState.on("toolChanged", (data) => {
+            toolChangedFired = true;
+            log("editor-log", `✓ Event fired: toolChanged -> ${data.tool}`, "success");
+          });
+
+          editorState.setTool(Tool.Fill);
+          if (!toolChangedFired) {
+            log("editor-log", "✗ toolChanged event not fired", "error");
+          }
+
+          if (editorState.getTool() === Tool.Fill) {
+            log("editor-log", "✓ Tool set correctly", "success");
+          } else {
+            log("editor-log", "✗ Tool not set correctly", "error");
+          }
+
+          // Test zoom change
+          let zoomChangedFired = false;
+          editorState.on("zoomChanged", (data) => {
+            zoomChangedFired = true;
+            log("editor-log", `✓ Event fired: zoomChanged -> ${data.zoom}`, "success");
+          });
+
+          editorState.setZoom(8);
+          if (!zoomChangedFired) {
+            log("editor-log", "✗ zoomChanged event not fired", "error");
+          }
+
+          if (editorState.getZoom() === 8) {
+            log("editor-log", "✓ Zoom set correctly", "success");
+          } else {
+            log("editor-log", "✗ Zoom not set correctly", "error");
+          }
+
+          // Test zoom clamping
+          editorState.setZoom(100); // Should be clamped to 32
+          if (editorState.getZoom() === 32) {
+            log("editor-log", "✓ Zoom clamped to max (32)", "success");
+          } else {
+            log("editor-log", "✗ Zoom not clamped correctly", "error");
+          }
+
+          editorState.setZoom(-5); // Should be clamped to 1
+          if (editorState.getZoom() === 1) {
+            log("editor-log", "✓ Zoom clamped to min (1)", "success");
+          } else {
+            log("editor-log", "✗ Zoom not clamped correctly", "error");
+          }
+
+          // Test grid toggle
+          let gridToggledFired = false;
+          editorState.on("gridToggled", (data) => {
+            gridToggledFired = true;
+            log("editor-log", `✓ Event fired: gridToggled -> ${data.enabled}`, "success");
+          });
+
+          editorState.setGridEnabled(false);
+          if (!gridToggledFired) {
+            log("editor-log", "✗ gridToggled event not fired", "error");
+          }
+
+          if (!editorState.isGridEnabled()) {
+            log("editor-log", "✓ Grid disabled correctly", "success");
+          } else {
+            log("editor-log", "✗ Grid not disabled", "error");
+          }
+
+          log("editor-log", "✓ All EditorState tests completed", "success");
+        } catch (error) {
+          log("editor-log", `✗ Error: ${error.message}`, "error");
+        }
+      }
+
+      async function runAllTests() {
+        await testTileModel();
+        await testPaletteModel();
+        await testEditorState();
+      }
+
+      // Initialize on page load
+      init();
+    </script>
+  </body>
+</html>
