@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TileCanvas Test - Semitile</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #1a1a2e;
+        color: #ffffff;
+        padding: 2rem;
+        line-height: 1.6;
+      }
+
+      h1 {
+        color: #00ff88;
+        border-bottom: 2px solid #00ff88;
+        padding-bottom: 0.5rem;
+      }
+
+      h2 {
+        color: #00d4ff;
+        margin-top: 2rem;
+      }
+
+      .test-section {
+        background: #16213e;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        border-radius: 8px;
+        border: 1px solid #0f3460;
+      }
+
+      .canvas-container {
+        display: flex;
+        justify-content: center;
+        margin: 2rem 0;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .control-group label {
+        color: #00d4ff;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .palette-swatches {
+        display: grid;
+        grid-template-columns: repeat(8, 32px);
+        gap: 4px;
+      }
+
+      .palette-swatch {
+        width: 32px;
+        height: 32px;
+        border: 2px solid #0f3460;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: border-color 0.2s;
+      }
+
+      .palette-swatch:hover {
+        border-color: #00d4ff;
+      }
+
+      .palette-swatch.selected {
+        border-color: #00ff88;
+        border-width: 3px;
+      }
+
+      button {
+        background: #00ff88;
+        color: #1a1a2e;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      button:hover {
+        background: #00cc6a;
+      }
+
+      input[type="range"] {
+        width: 200px;
+      }
+
+      input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+      }
+
+      .log {
+        background: #0a0a0f;
+        padding: 1rem;
+        border-radius: 4px;
+        font-family: "SF Mono", "Courier New", monospace;
+        font-size: 0.9rem;
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 0.5rem;
+      }
+
+      .log-entry {
+        margin: 0.25rem 0;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid #16213e;
+        color: #00d4ff;
+      }
+
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+
+      .status {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        font-weight: 600;
+      }
+
+      .status.loading {
+        background: #0f3460;
+        color: #00d4ff;
+      }
+
+      .status.ready {
+        background: #003d2e;
+        color: #00ff88;
+      }
+
+      .status.error {
+        background: #4d0026;
+        color: #ff0088;
+      }
+
+      .info-text {
+        color: #b8b8b8;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TileCanvas View Component Test</h1>
+    <p>
+      This page tests the TileCanvas View component (Stage 5) with the Model layer.
+    </p>
+
+    <div id="status" class="status loading">Loading WASM module...</div>
+
+    <div id="test-content" style="display: none">
+      <div class="test-section">
+        <h2>Tile Editor</h2>
+        <p class="info-text">
+          Click on the tile canvas to draw. The component dispatches events but
+          doesn't modify models directly - that's the Controller's job (Stage 6).
+        </p>
+
+        <div class="canvas-container">
+          <tile-canvas id="tile-canvas"></tile-canvas>
+        </div>
+
+        <div class="controls">
+          <div class="control-group">
+            <label>Zoom Level: <span id="zoom-value">16</span>x</label>
+            <input
+              type="range"
+              id="zoom-slider"
+              min="1"
+              max="32"
+              value="16"
+              step="1"
+            />
+          </div>
+
+          <div class="control-group">
+            <label>
+              <input type="checkbox" id="grid-toggle" checked />
+              Show Grid
+            </label>
+          </div>
+
+          <div class="control-group">
+            <button id="clear-btn">Clear Tile</button>
+            <button id="fill-btn">Fill with Color</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-section">
+        <h2>Palette (Colors 0-15 of Active Sub-Palette)</h2>
+        <p class="info-text">
+          Click a color to select it for painting. Note: This test doesn't implement
+          painting yet (that's for the Controller in Stage 6).
+        </p>
+        <div class="palette-swatches" id="palette-swatches"></div>
+      </div>
+
+      <div class="test-section">
+        <h2>Event Log</h2>
+        <p class="info-text">
+          Watch the events dispatched by the TileCanvas component. These events
+          would be handled by the Controller to modify the Models.
+        </p>
+        <button onclick="clearEventLog()">Clear Log</button>
+        <div id="event-log" class="log"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initWasm, WasmTile, WasmPalette } from "../lib/wasm-loader.js";
+      import { TileModel } from "../models/TileModel.js";
+      import { PaletteModel } from "../models/PaletteModel.js";
+      import { EditorState } from "../models/EditorState.js";
+      import { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
+
+      let tileModel, paletteModel, editorState, tileCanvas;
+
+      // Initialize WASM and set up the view
+      async function init() {
+        const statusDiv = document.getElementById("status");
+        const testContent = document.getElementById("test-content");
+
+        try {
+          await initWasm();
+          statusDiv.className = "status ready";
+          statusDiv.textContent = "✓ WASM module loaded successfully";
+          testContent.style.display = "block";
+
+          // Create Models
+          tileModel = new TileModel(new WasmTile());
+          paletteModel = new PaletteModel(new WasmPalette());
+          editorState = new EditorState();
+
+          // Set up a default palette with some colors
+          setupDefaultPalette();
+
+          // Get the TileCanvas view
+          tileCanvas = document.getElementById("tile-canvas");
+
+          // Inject models into the view (this is what a Controller would do)
+          tileCanvas.setModels(tileModel, paletteModel, editorState);
+
+          // Set up event listeners on the view
+          tileCanvas.addEventListener("draw-start", handleDrawStart);
+          tileCanvas.addEventListener("draw-move", handleDrawMove);
+          tileCanvas.addEventListener("draw-end", handleDrawEnd);
+
+          // Set up UI controls
+          setupControls();
+          renderPalette();
+
+          // Make functions globally available
+          window.clearEventLog = clearEventLog;
+
+          console.log("TileCanvas test page ready");
+        } catch (error) {
+          statusDiv.className = "status error";
+          statusDiv.textContent = `✗ Failed to load WASM: ${error.message}`;
+          console.error("Initialization error:", error);
+        }
+      }
+
+      function setupDefaultPalette() {
+        // Set up some basic colors for testing
+        const colors = [
+          { r: 0, g: 0, b: 0 }, // 0: Black (transparent)
+          { r: 255, g: 255, b: 255 }, // 1: White
+          { r: 255, g: 0, b: 0 }, // 2: Red
+          { r: 0, g: 255, b: 0 }, // 3: Green
+          { r: 0, g: 0, b: 255 }, // 4: Blue
+          { r: 255, g: 255, b: 0 }, // 5: Yellow
+          { r: 255, g: 0, b: 255 }, // 6: Magenta
+          { r: 0, g: 255, b: 255 }, // 7: Cyan
+          { r: 128, g: 128, b: 128 }, // 8: Gray
+          { r: 255, g: 128, b: 0 }, // 9: Orange
+          { r: 128, g: 0, b: 255 }, // 10: Purple
+          { r: 0, g: 128, b: 128 }, // 11: Teal
+          { r: 128, g: 64, b: 0 }, // 12: Brown
+          { r: 255, g: 192, b: 203 }, // 13: Pink
+          { r: 64, g: 64, b: 64 }, // 14: Dark Gray
+          { r: 192, g: 192, b: 192 }, // 15: Light Gray
+        ];
+
+        colors.forEach((color, idx) => {
+          paletteModel.setColor(0, idx, color.r, color.g, color.b);
+        });
+      }
+
+      function renderPalette() {
+        const container = document.getElementById("palette-swatches");
+        container.innerHTML = "";
+
+        for (let i = 0; i < 16; i++) {
+          const swatch = document.createElement("div");
+          swatch.className = "palette-swatch";
+          if (i === paletteModel.getSelectedColorIndex()) {
+            swatch.classList.add("selected");
+          }
+
+          const color = paletteModel.getColor(0, i);
+          swatch.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
+          swatch.title = `Color ${i}`;
+          swatch.addEventListener("click", () => {
+            paletteModel.selectColor(i);
+            renderPalette(); // Re-render to update selection
+            logEvent(`Selected color ${i}`);
+          });
+
+          container.appendChild(swatch);
+        }
+      }
+
+      function setupControls() {
+        // Zoom slider
+        const zoomSlider = document.getElementById("zoom-slider");
+        const zoomValue = document.getElementById("zoom-value");
+        zoomSlider.addEventListener("input", (e) => {
+          const zoom = parseInt(e.target.value);
+          zoomValue.textContent = zoom;
+          editorState.setZoom(zoom);
+          logEvent(`Zoom changed to ${zoom}x`);
+        });
+
+        // Grid toggle
+        const gridToggle = document.getElementById("grid-toggle");
+        gridToggle.addEventListener("change", (e) => {
+          editorState.setGridEnabled(e.target.checked);
+          logEvent(`Grid ${e.target.checked ? "enabled" : "disabled"}`);
+        });
+
+        // Clear button
+        document.getElementById("clear-btn").addEventListener("click", () => {
+          tileModel.clear();
+          logEvent("Tile cleared");
+        });
+
+        // Fill button
+        document.getElementById("fill-btn").addEventListener("click", () => {
+          const colorIdx = paletteModel.getSelectedColorIndex();
+          for (let y = 0; y < 8; y++) {
+            for (let x = 0; x < 8; x++) {
+              tileModel.setPixel(x, y, colorIdx);
+            }
+          }
+          logEvent(`Tile filled with color ${colorIdx}`);
+        });
+      }
+
+      function handleDrawStart(e) {
+        logEvent(`draw-start at (${e.detail.x}, ${e.detail.y})`);
+        // In a real app, the Controller would handle this and update the model
+        // For now, let's update directly for testing
+        const colorIdx = paletteModel.getSelectedColorIndex();
+        tileModel.setPixel(e.detail.x, e.detail.y, colorIdx);
+      }
+
+      function handleDrawMove(e) {
+        logEvent(`draw-move at (${e.detail.x}, ${e.detail.y})`);
+        // Note: We'd normally only draw if mouse is down, but for testing this is fine
+      }
+
+      function handleDrawEnd(e) {
+        logEvent(`draw-end at (${e.detail.x}, ${e.detail.y})`);
+      }
+
+      function logEvent(message) {
+        const logDiv = document.getElementById("event-log");
+        const entry = document.createElement("div");
+        entry.className = "log-entry";
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+
+        // Limit log to 50 entries
+        while (logDiv.children.length > 50) {
+          logDiv.removeChild(logDiv.firstChild);
+        }
+      }
+
+      function clearEventLog() {
+        document.getElementById("event-log").innerHTML = "";
+      }
+
+      // Initialize on page load
+      init();
+    </script>
+  </body>
+</html>
