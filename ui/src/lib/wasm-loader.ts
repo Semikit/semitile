@@ -25,16 +25,7 @@ import init, {
   WasmTilemap,
 } from '../../../web/pkg/web.js';
 
-// Export types for use in Models
-export type {
-  WasmTile,
-  WasmColor,
-  WasmPalette,
-  WasmTilemapEntry,
-  WasmTilemap,
-};
-
-// Re-export constructors
+// Re-export classes for use in Models and Views
 export { WasmTile, WasmColor, WasmPalette, WasmTilemapEntry, WasmTilemap };
 
 /**

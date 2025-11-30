@@ -18,7 +18,7 @@
  */
 
 import { EventEmitter } from "./EventEmitter.js";
-import type { WasmTilemap, WasmTilemapEntry } from "../lib/wasm-loader.js";
+import { WasmTilemap, WasmTilemapEntry } from "../lib/wasm-loader.js";
 
 /**
  * TilemapModel - Observable state container for tilemap data
@@ -102,12 +102,9 @@ export class TilemapModel extends EventEmitter {
     hFlip: boolean,
     vFlip: boolean
   ): void {
-    // Import WasmTilemapEntry to create the entry
-    import("../lib/wasm-loader.js").then(({ WasmTilemapEntry }) => {
-      const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
-      this.tilemap.setEntry(x, y, entry);
-      this.emit("entryChanged", { x, y, tileIndex, paletteIdx, hFlip, vFlip });
-    });
+    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
+    this.tilemap.setEntry(x, y, entry);
+    this.emit("entryChanged", { x, y, tileIndex, paletteIdx, hFlip, vFlip });
   }
 
   /**
@@ -153,11 +150,9 @@ export class TilemapModel extends EventEmitter {
    * Emits 'tilemapFilled' event
    */
   fill(tileIndex: number, paletteIdx: number, hFlip: boolean, vFlip: boolean): void {
-    import("../lib/wasm-loader.js").then(({ WasmTilemapEntry }) => {
-      const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
-      this.tilemap.fill(entry);
-      this.emit("tilemapFilled", { tileIndex, paletteIdx, hFlip, vFlip });
-    });
+    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
+    this.tilemap.fill(entry);
+    this.emit("tilemapFilled", { tileIndex, paletteIdx, hFlip, vFlip });
   }
 
   /**
@@ -175,15 +170,12 @@ export class TilemapModel extends EventEmitter {
    * @returns true if import succeeded, false otherwise
    */
   importBinary(data: Uint8Array, width: number, height: number): boolean {
-    import("../lib/wasm-loader.js").then(({ WasmTilemap }) => {
-      const imported = WasmTilemap.importBinary(data, width, height);
-      if (imported) {
-        this.tilemap = imported;
-        this.emit("tilemapImported", {});
-        return true;
-      }
-      return false;
-    });
+    const imported = WasmTilemap.importBinary(data, width, height);
+    if (imported) {
+      this.tilemap = imported;
+      this.emit("tilemapImported", {});
+      return true;
+    }
     return false;
   }
 

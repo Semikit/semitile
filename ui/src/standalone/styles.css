@@ -521,3 +521,42 @@ body {
   padding: var(--spacing-xl);
   font-style: italic;
 }
+
+/* Tilemap Section */
+.tilemap-section {
+  background: var(--c16-bg-medium);
+  border-top: 2px solid var(--c16-bg-light);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.tilemap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.tilemap-controls {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.tilemap-content {
+  display: flex;
+  gap: var(--spacing-lg);
+  min-height: 520px;
+}
+
+tilemap-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.tilemap-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+}

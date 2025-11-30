@@ -24,15 +24,15 @@
         </div>
         <nav class="app-nav">
           <div class="nav-group">
-            <button id="btn-save" class="nav-button">Save Project</button>
-            <button id="btn-load" class="nav-button secondary">Load Project</button>
-            <button id="btn-export" class="nav-button secondary">Export</button>
+            <button id="btn-save" class="nav-button" title="Save project to browser storage">Save Project</button>
+            <button id="btn-load" class="nav-button secondary" title="Load a saved project or import from file">Load Project</button>
+            <button id="btn-export" class="nav-button secondary" title="Export tiles, palette, or tilemap to various formats">Export</button>
           </div>
           <div class="nav-divider"></div>
           <div class="nav-group">
-            <button id="btn-clear" class="nav-button secondary">Clear</button>
-            <button id="btn-undo" class="nav-button secondary" disabled>Undo</button>
-            <button id="btn-redo" class="nav-button secondary" disabled>Redo</button>
+            <button id="btn-clear" class="nav-button secondary" title="Clear the active tile">Clear</button>
+            <button id="btn-undo" class="nav-button secondary" disabled title="Undo last action (Ctrl+Z)">Undo</button>
+            <button id="btn-redo" class="nav-button secondary" disabled title="Redo last undone action (Ctrl+Y)">Redo</button>
           </div>
         </nav>
       </header>
@@ -46,28 +46,35 @@
 
           <div class="dialog-section">
             <h3 class="section-title">Active Tile Exports</h3>
-            <button id="export-tile-bin" class="dialog-button">Tile Binary (.bin)</button>
-            <button id="export-tile-h" class="dialog-button">Tile C Header (.h)</button>
-            <button id="export-tile-asm" class="dialog-button">Tile Assembly (.asm)</button>
+            <button id="export-tile-bin" class="dialog-button" title="Export active tile as 32-byte planar binary">Tile Binary (.bin)</button>
+            <button id="export-tile-h" class="dialog-button" title="Export active tile as C header file">Tile C Header (.h)</button>
+            <button id="export-tile-asm" class="dialog-button" title="Export active tile as Assembly file">Tile Assembly (.asm)</button>
           </div>
 
           <div class="dialog-section">
             <h3 class="section-title">All Tiles Exports</h3>
-            <button id="export-all-tiles-bin" class="dialog-button">All Tiles Binary (.bin)</button>
-            <button id="export-all-tiles-h" class="dialog-button">All Tiles C Header (.h)</button>
-            <button id="export-all-tiles-asm" class="dialog-button">All Tiles Assembly (.asm)</button>
+            <button id="export-all-tiles-bin" class="dialog-button" title="Export all tiles as single binary file">All Tiles Binary (.bin)</button>
+            <button id="export-all-tiles-h" class="dialog-button" title="Export all tiles as C header array">All Tiles C Header (.h)</button>
+            <button id="export-all-tiles-asm" class="dialog-button" title="Export all tiles as Assembly file">All Tiles Assembly (.asm)</button>
           </div>
 
           <div class="dialog-section">
             <h3 class="section-title">Palette Exports</h3>
-            <button id="export-palette-bin" class="dialog-button">Palette Binary (.bin)</button>
-            <button id="export-palette-h" class="dialog-button">Palette C Header (.h)</button>
-            <button id="export-palette-asm" class="dialog-button">Palette Assembly (.asm)</button>
+            <button id="export-palette-bin" class="dialog-button" title="Export palette as 512-byte RGB555 binary">Palette Binary (.bin)</button>
+            <button id="export-palette-h" class="dialog-button" title="Export palette as C header file">Palette C Header (.h)</button>
+            <button id="export-palette-asm" class="dialog-button" title="Export palette as Assembly file">Palette Assembly (.asm)</button>
+          </div>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Tilemap Exports</h3>
+            <button id="export-tilemap-bin" class="dialog-button" title="Export tilemap as binary file">Tilemap Binary (.bin)</button>
+            <button id="export-tilemap-h" class="dialog-button" title="Export tilemap as C header file">Tilemap C Header (.h)</button>
+            <button id="export-tilemap-asm" class="dialog-button" title="Export tilemap as Assembly file">Tilemap Assembly (.asm)</button>
           </div>
 
           <div class="dialog-section">
             <h3 class="section-title">Project Export</h3>
-            <button id="export-project-json" class="dialog-button">Project JSON (.json)</button>
+            <button id="export-project-json" class="dialog-button" title="Export entire project as JSON file">Project JSON (.json)</button>
           </div>
 
           <div class="dialog-actions">
@@ -93,7 +100,7 @@
           <div class="dialog-section">
             <h3 class="section-title">Import from File</h3>
             <input type="file" id="import-project" accept=".json" style="display: none" />
-            <button id="import-project-btn" class="dialog-button">Import Project JSON</button>
+            <button id="import-project-btn" class="dialog-button" title="Import a project from a JSON file">Import Project JSON</button>
           </div>
 
           <div class="dialog-actions">
@@ -117,12 +124,13 @@
               class="text-input"
               placeholder="my_tile"
               value="untitled"
+              title="Enter a name for your project"
             />
           </div>
 
           <div class="dialog-actions">
-            <button id="save-confirm" class="dialog-button-primary">Save</button>
-            <button id="save-close" class="dialog-button-secondary">Cancel</button>
+            <button id="save-confirm" class="dialog-button-primary" title="Save project to browser storage">Save</button>
+            <button id="save-close" class="dialog-button-secondary" title="Cancel and close dialog">Cancel</button>
           </div>
         </div>
       </div>
@@ -163,6 +171,27 @@
           <color-picker id="color-picker"></color-picker>
         </aside>
       </main>
+
+      <!-- Tilemap Editor Section -->
+      <section class="tilemap-section">
+        <div class="tilemap-header">
+          <div class="panel-header">
+            <h2 class="panel-title">Tilemap Editor</h2>
+            <p class="panel-subtitle">Arrange tiles into scenes</p>
+          </div>
+          <div class="tilemap-controls">
+            <button id="btn-tilemap-resize" class="nav-button secondary" title="Resize tilemap dimensions">Resize</button>
+            <button id="btn-tilemap-clear" class="nav-button secondary" title="Clear entire tilemap">Clear</button>
+            <button id="btn-tilemap-fill" class="nav-button secondary" title="Fill tilemap with active tile">Fill</button>
+          </div>
+        </div>
+        <div class="tilemap-content">
+          <tilemap-editor id="tilemap-editor"></tilemap-editor>
+          <aside class="tilemap-sidebar">
+            <tile-attributes-panel id="tile-attributes"></tile-attributes-panel>
+          </aside>
+        </div>
+      </section>
 
       <footer class="app-footer">
         <p class="footer-text">

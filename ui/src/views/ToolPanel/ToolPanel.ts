@@ -313,12 +313,13 @@ export class ToolPanel extends HTMLElement {
               max="32"
               value="${currentZoom}"
               step="1"
+              title="Adjust zoom level (+/- keys)"
             />
           </div>
         </div>
 
         <div class="panel-section">
-          <label class="checkbox-container">
+          <label class="checkbox-container" title="Toggle pixel grid (G)">
             <input
               type="checkbox"
               id="grid-toggle"
@@ -339,18 +340,19 @@ export class ToolPanel extends HTMLElement {
    */
   private renderToolButtons(currentTool: Tool): string {
     const tools = [
-      { tool: Tool.Pencil, icon: "✏️", label: "Pencil" },
-      { tool: Tool.Fill, icon: "🪣", label: "Fill" },
-      { tool: Tool.Line, icon: "📏", label: "Line" },
-      { tool: Tool.Rectangle, icon: "⬜", label: "Rectangle" },
+      { tool: Tool.Pencil, icon: "✏️", label: "Pencil", shortcut: "P" },
+      { tool: Tool.Fill, icon: "🪣", label: "Fill", shortcut: "F" },
+      { tool: Tool.Line, icon: "📏", label: "Line", shortcut: "L" },
+      { tool: Tool.Rectangle, icon: "⬜", label: "Rectangle", shortcut: "R" },
     ];
 
     return tools
       .map(
-        ({ tool, icon, label }) => `
+        ({ tool, icon, label, shortcut }) => `
         <button
           class="tool-button ${tool === currentTool ? "active" : ""}"
           data-tool="${tool}"
+          title="${label} tool (${shortcut})"
         >
           <span class="tool-icon">${icon}</span>
           <span>${label}</span>

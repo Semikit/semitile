@@ -18,12 +18,13 @@
  */
 
 // WASM Loader
-import { initWasm, WasmTile, WasmPalette } from "../lib/wasm-loader.js";
+import { initWasm, WasmPalette, WasmTilemap } from "../lib/wasm-loader.js";
 
 // Models
 import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { EditorState } from "../models/EditorState.js";
+import { TilemapModel } from "../models/TilemapModel.js";
 
 // Views
 import { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
@@ -31,12 +32,15 @@ import { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
 import { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
 import { ToolPanel } from "../views/ToolPanel/ToolPanel.js";
 import { TileBank } from "../views/TileBank/TileBank.js";
+import { TilemapEditor } from "../views/TilemapEditor/TilemapEditor.js";
+import { TileAttributesPanel } from "../views/TileAttributesPanel/TileAttributesPanel.js";
 
 // Controllers
 import { TileEditorController } from "../controllers/TileEditorController.js";
 import { PaletteController } from "../controllers/PaletteController.js";
 import { FileController } from "../controllers/FileController.js";
 import { TileBankController } from "../controllers/TileBankController.js";
+import { TilemapController } from "../controllers/TilemapController.js";
 
 // Command History
 import { CommandHistory } from "../models/CommandHistory.js";
@@ -67,6 +71,7 @@ async function main() {
     const tileBankModel = new TileBankModel(); // Starts with one empty tile
     const paletteModel = new PaletteModel(new WasmPalette());
     const editorState = new EditorState();
+    const tilemapModel = new TilemapModel(new WasmTilemap(32, 32)); // Default 32×32 tilemap
 
     console.log("[App] Models created");
 
@@ -81,8 +86,10 @@ async function main() {
     const colorPicker = document.getElementById("color-picker") as ColorPicker;
     const toolPanel = document.getElementById("tool-panel") as ToolPanel;
     const tileBank = document.getElementById("tile-bank") as TileBank;
+    const tilemapEditor = document.getElementById("tilemap-editor") as TilemapEditor;
+    const tileAttributesPanel = document.getElementById("tile-attributes") as TileAttributesPanel;
 
-    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel || !tileBank) {
+    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel || !tileBank || !tilemapEditor || !tileAttributesPanel) {
       throw new Error("Failed to get View elements from DOM");
     }
 
@@ -120,8 +127,18 @@ async function main() {
       tileBank
     );
 
-    // File Controller - handles save/load/export operations
-    const fileController = new FileController(tileBankModel, paletteModel);
+    // Tilemap Controller - handles tilemap editing
+    const tilemapController = new TilemapController(
+      tilemapModel,
+      tileBankModel,
+      tilemapEditor
+    );
+
+    // Wire up TilemapEditor View to Models
+    tilemapEditor.setModels(tilemapModel, tileBankModel, paletteModel);
+
+    // File Controller - handles save/load/export operations (now with tilemap support)
+    const fileController = new FileController(tileBankModel, paletteModel, tilemapModel);
 
     console.log("[App] Controllers created and wired");
 
@@ -147,6 +164,70 @@ async function main() {
     });
 
     console.log("[App] ToolPanel wired to EditorState");
+
+    // ===== WIRE UP TILE ATTRIBUTES PANEL =====
+
+    tileAttributesPanel.addEventListener("palette-changed", (e) => {
+      const customEvent = e as CustomEvent<{ paletteIdx: number }>;
+      tilemapController.setPaletteIdx(customEvent.detail.paletteIdx);
+    });
+
+    tileAttributesPanel.addEventListener("h-flip-changed", (e) => {
+      const customEvent = e as CustomEvent<{ hFlip: boolean }>;
+      tilemapController.setHFlip(customEvent.detail.hFlip);
+    });
+
+    tileAttributesPanel.addEventListener("v-flip-changed", (e) => {
+      const customEvent = e as CustomEvent<{ vFlip: boolean }>;
+      tilemapController.setVFlip(customEvent.detail.vFlip);
+    });
+
+    console.log("[App] TileAttributesPanel wired to TilemapController");
+
+    // ===== WIRE UP TILEMAP CONTROL BUTTONS =====
+
+    const btnTilemapResize = document.getElementById("btn-tilemap-resize");
+    const btnTilemapClear = document.getElementById("btn-tilemap-clear");
+    const btnTilemapFill = document.getElementById("btn-tilemap-fill");
+
+    if (btnTilemapResize) {
+      btnTilemapResize.addEventListener("click", () => {
+        const width = prompt("Enter tilemap width (1-256):", "32");
+        const height = prompt("Enter tilemap height (1-256):", "32");
+
+        if (width && height) {
+          const w = parseInt(width, 10);
+          const h = parseInt(height, 10);
+
+          if (!isNaN(w) && !isNaN(h) && w >= 1 && w <= 256 && h >= 1 && h <= 256) {
+            tilemapController.resize(w, h);
+            console.log(`[App] Tilemap resized to ${w}×${h}`);
+          } else {
+            alert("Invalid dimensions. Please enter values between 1 and 256.");
+          }
+        }
+      });
+    }
+
+    if (btnTilemapClear) {
+      btnTilemapClear.addEventListener("click", () => {
+        if (confirm("Clear entire tilemap? This cannot be undone.")) {
+          tilemapController.clear();
+          console.log("[App] Tilemap cleared");
+        }
+      });
+    }
+
+    if (btnTilemapFill) {
+      btnTilemapFill.addEventListener("click", () => {
+        if (confirm("Fill entire tilemap with active tile?")) {
+          tilemapController.fill();
+          console.log("[App] Tilemap filled with active tile");
+        }
+      });
+    }
+
+    console.log("[App] Tilemap control buttons wired");
 
     // ===== WIRE UP NAVIGATION BUTTONS =====
 
@@ -193,10 +274,17 @@ async function main() {
     // ===== KEYBOARD SHORTCUTS =====
 
     document.addEventListener("keydown", (e) => {
+      // Don't process shortcuts if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+        return;
+      }
+
       // Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         tileEditorController.undo();
+        return;
       }
 
       // Redo: Ctrl+Y (Windows/Linux) or Cmd+Shift+Z (Mac)
@@ -206,10 +294,80 @@ async function main() {
       ) {
         e.preventDefault();
         tileEditorController.redo();
+        return;
+      }
+
+      // Tool shortcuts (P, F, L, R)
+      const key = e.key.toLowerCase();
+
+      if (key === "p") {
+        e.preventDefault();
+        editorState.setTool("pencil" as any);
+        console.log("[App] Switched to Pencil tool (P)");
+        return;
+      }
+
+      if (key === "f") {
+        e.preventDefault();
+        editorState.setTool("fill" as any);
+        console.log("[App] Switched to Fill tool (F)");
+        return;
+      }
+
+      if (key === "l") {
+        e.preventDefault();
+        editorState.setTool("line" as any);
+        console.log("[App] Switched to Line tool (L)");
+        return;
+      }
+
+      if (key === "r") {
+        e.preventDefault();
+        editorState.setTool("rectangle" as any);
+        console.log("[App] Switched to Rectangle tool (R)");
+        return;
+      }
+
+      // Grid toggle (G)
+      if (key === "g") {
+        e.preventDefault();
+        editorState.setGridEnabled(!editorState.isGridEnabled());
+        console.log(`[App] Grid ${editorState.isGridEnabled() ? "enabled" : "disabled"} (G)`);
+        return;
+      }
+
+      // Zoom in/out (+/-)
+      if (key === "+" || key === "=") {
+        e.preventDefault();
+        const currentZoom = editorState.getZoom();
+        editorState.setZoom(currentZoom + 2);
+        console.log(`[App] Zoom in: ${editorState.getZoom()}x (+)`);
+        return;
+      }
+
+      if (key === "-" || key === "_") {
+        e.preventDefault();
+        const currentZoom = editorState.getZoom();
+        editorState.setZoom(currentZoom - 2);
+        console.log(`[App] Zoom out: ${editorState.getZoom()}x (-)`);
+        return;
+      }
+
+      // Color selection shortcuts (0-9)
+      const numKey = parseInt(key, 10);
+      if (!isNaN(numKey) && numKey >= 0 && numKey <= 9) {
+        e.preventDefault();
+        paletteModel.selectColor(numKey);
+        console.log(`[App] Selected color ${numKey} (${key})`);
+        return;
       }
     });
 
     console.log("[App] Keyboard shortcuts registered");
+    console.log("[App] - Tools: P (Pencil), F (Fill), L (Line), R (Rectangle)");
+    console.log("[App] - Colors: 0-9 (select first 10 colors)");
+    console.log("[App] - View: G (toggle grid), +/- (zoom)");
+    console.log("[App] - Edit: Ctrl+Z (undo), Ctrl+Y (redo)");
 
     // ===== WIRE UP FILE OPERATIONS =====
 
@@ -467,6 +625,33 @@ async function main() {
       btnExportPaletteAsm.addEventListener("click", () => {
         const name = fileController.getCurrentProjectName();
         fileController.exportPaletteASM(`${name}_palette.asm`);
+      });
+    }
+
+    // Export tilemap binary
+    const btnExportTilemapBin = document.getElementById("export-tilemap-bin");
+    if (btnExportTilemapBin) {
+      btnExportTilemapBin.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTilemapBinary(`${name}_tilemap.bin`);
+      });
+    }
+
+    // Export tilemap C header
+    const btnExportTilemapH = document.getElementById("export-tilemap-h");
+    if (btnExportTilemapH) {
+      btnExportTilemapH.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTilemapCHeader(`${name}_tilemap.h`);
+      });
+    }
+
+    // Export tilemap ASM
+    const btnExportTilemapAsm = document.getElementById("export-tilemap-asm");
+    if (btnExportTilemapAsm) {
+      btnExportTilemapAsm.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTilemapASM(`${name}_tilemap.asm`);
       });
     }
 
