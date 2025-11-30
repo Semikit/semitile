@@ -36,6 +36,9 @@ import { TileEditorController } from "../controllers/TileEditorController.js";
 import { PaletteController } from "../controllers/PaletteController.js";
 import { FileController } from "../controllers/FileController.js";
 
+// Command History
+import { CommandHistory } from "../models/CommandHistory.js";
+
 /**
  * Main application entry point
  *
@@ -82,6 +85,11 @@ async function main() {
 
     console.log("[App] View elements retrieved");
 
+    // ===== CREATE SHARED COMMAND HISTORY =====
+    // Both TileEditorController and PaletteController share the same history
+    // This allows undo/redo to work across both tile and palette edits
+    const commandHistory = new CommandHistory();
+
     // ===== CREATE CONTROLLERS (Wire Views to Models) =====
     console.log("[App] Creating Controllers...");
 
@@ -90,14 +98,16 @@ async function main() {
       tileModel,
       paletteModel,
       editorState,
-      tileCanvas
+      tileCanvas,
+      commandHistory
     );
 
     // Palette Controller - handles palette and color editing
     const paletteController = new PaletteController(
       paletteModel,
       paletteEditor,
-      colorPicker
+      colorPicker,
+      commandHistory
     );
 
     // File Controller - handles save/load/export operations
@@ -152,7 +162,44 @@ async function main() {
       });
     }
 
+    // Function to update undo/redo button states
+    const updateUndoRedoButtons = () => {
+      if (btnUndo) {
+        btnUndo.disabled = !commandHistory.canUndo();
+      }
+      if (btnRedo) {
+        btnRedo.disabled = !commandHistory.canRedo();
+      }
+    };
+
+    // Listen to command history changes to update button states
+    commandHistory.on("historyChanged", updateUndoRedoButtons);
+
+    // Initial button state
+    updateUndoRedoButtons();
+
     console.log("[App] Navigation buttons wired");
+
+    // ===== KEYBOARD SHORTCUTS =====
+
+    document.addEventListener("keydown", (e) => {
+      // Undo: Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        tileEditorController.undo();
+      }
+
+      // Redo: Ctrl+Y (Windows/Linux) or Cmd+Shift+Z (Mac)
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "z")
+      ) {
+        e.preventDefault();
+        tileEditorController.redo();
+      }
+    });
+
+    console.log("[App] Keyboard shortcuts registered");
 
     // ===== WIRE UP FILE OPERATIONS =====
 

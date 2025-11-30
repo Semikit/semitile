@@ -21,6 +21,14 @@ import { TileModel } from "../models/TileModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { EditorState, Tool } from "../models/EditorState.js";
 import type { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
+import { CommandHistory } from "../models/CommandHistory.js";
+import {
+  SetPixelCommand,
+  FillCommand,
+  LineCommand,
+  RectangleCommand,
+  ClearTileCommand,
+} from "../models/TileCommands.js";
 
 /**
  * TileEditorController - Business logic for tile editing
@@ -53,13 +61,16 @@ export class TileEditorController {
   private isDrawing: boolean = false;
   private lineStartX: number = -1;
   private lineStartY: number = -1;
+  private commandHistory: CommandHistory;
 
   constructor(
     private tileModel: TileModel,
     private paletteModel: PaletteModel,
     private editorState: EditorState,
-    private view: TileCanvas
+    private view: TileCanvas,
+    commandHistory?: CommandHistory
   ) {
+    this.commandHistory = commandHistory || new CommandHistory();
     this.setupView();
     this.attachViewListeners();
   }
@@ -147,7 +158,8 @@ export class TileEditorController {
    */
   private drawPixel(x: number, y: number): void {
     const colorIndex = this.paletteModel.getSelectedColorIndex();
-    this.tileModel.setPixel(x, y, colorIndex);
+    const command = new SetPixelCommand(this.tileModel, x, y, colorIndex);
+    this.commandHistory.executeCommand(command);
   }
 
   /**
@@ -157,83 +169,33 @@ export class TileEditorController {
    */
   private floodFill(startX: number, startY: number): void {
     const newColor = this.paletteModel.getSelectedColorIndex();
-    const targetColor = this.tileModel.getPixel(startX, startY);
-
-    // Nothing to do if colors are the same
-    if (targetColor === newColor) return;
-
-    // Use a stack-based approach to avoid recursion stack overflow
-    const stack: Array<{ x: number; y: number }> = [{ x: startX, y: startY }];
-
-    while (stack.length > 0) {
-      const { x, y } = stack.pop()!;
-
-      // Skip if out of bounds
-      if (x < 0 || x >= 8 || y < 0 || y >= 8) continue;
-
-      // Skip if not the target color
-      if (this.tileModel.getPixel(x, y) !== targetColor) continue;
-
-      // Fill this pixel
-      this.tileModel.setPixel(x, y, newColor);
-
-      // Add neighbors to stack
-      stack.push({ x: x + 1, y });
-      stack.push({ x: x - 1, y });
-      stack.push({ x, y: y + 1 });
-      stack.push({ x, y: y - 1 });
-    }
+    const command = new FillCommand(this.tileModel, startX, startY, newColor);
+    this.commandHistory.executeCommand(command);
   }
 
   /**
    * Draw a line using Bresenham's line algorithm
    */
   private drawLine(x0: number, y0: number, x1: number, y1: number): void {
-    const dx = Math.abs(x1 - x0);
-    const dy = Math.abs(y1 - y0);
-    const sx = x0 < x1 ? 1 : -1;
-    const sy = y0 < y1 ? 1 : -1;
-    let err = dx - dy;
-
-    let x = x0;
-    let y = y0;
-
-    while (true) {
-      this.drawPixel(x, y);
-
-      // Check if we've reached the end
-      if (x === x1 && y === y1) break;
-
-      const e2 = 2 * err;
-
-      if (e2 > -dy) {
-        err -= dy;
-        x += sx;
-      }
-
-      if (e2 < dx) {
-        err += dx;
-        y += sy;
-      }
-    }
+    const colorIndex = this.paletteModel.getSelectedColorIndex();
+    const command = new LineCommand(this.tileModel, x0, y0, x1, y1, colorIndex);
+    this.commandHistory.executeCommand(command);
   }
 
   /**
    * Draw a filled rectangle
    */
   private drawRectangle(x0: number, y0: number, x1: number, y1: number): void {
-    const minX = Math.min(x0, x1);
-    const maxX = Math.max(x0, x1);
-    const minY = Math.min(y0, y1);
-    const maxY = Math.max(y0, y1);
-
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        if (x >= 0 && x < 8 && y >= 0 && y < 8) {
-          this.drawPixel(x, y);
-        }
-      }
-    }
+    const colorIndex = this.paletteModel.getSelectedColorIndex();
+    const command = new RectangleCommand(
+      this.tileModel,
+      x0,
+      y0,
+      x1,
+      y1,
+      colorIndex
+    );
+    this.commandHistory.executeCommand(command);
   }
 
   /**
@@ -242,25 +204,43 @@ export class TileEditorController {
    * Public API method for external control.
    */
   public clear(): void {
-    this.tileModel.clear();
+    const command = new ClearTileCommand(this.tileModel);
+    this.commandHistory.executeCommand(command);
   }
 
   /**
    * Undo the last action
-   *
-   * TODO: Implement with CommandHistory (Stage 11)
    */
   public undo(): void {
-    console.warn("Undo not yet implemented - will be added in Stage 11");
+    this.commandHistory.undo();
   }
 
   /**
    * Redo the last undone action
-   *
-   * TODO: Implement with CommandHistory (Stage 11)
    */
   public redo(): void {
-    console.warn("Redo not yet implemented - will be added in Stage 11");
+    this.commandHistory.redo();
+  }
+
+  /**
+   * Check if undo is available
+   */
+  public canUndo(): boolean {
+    return this.commandHistory.canUndo();
+  }
+
+  /**
+   * Check if redo is available
+   */
+  public canRedo(): boolean {
+    return this.commandHistory.canRedo();
+  }
+
+  /**
+   * Get the command history instance
+   */
+  public getCommandHistory(): CommandHistory {
+    return this.commandHistory;
   }
 
   /**

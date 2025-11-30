@@ -20,6 +20,8 @@
 import { PaletteModel } from "../models/PaletteModel.js";
 import type { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
 import type { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
+import { CommandHistory } from "../models/CommandHistory.js";
+import { SetColorCommand } from "../models/PaletteCommands.js";
 
 /**
  * PaletteController - Business logic for palette color selection and editing
@@ -51,16 +53,19 @@ import type { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
  */
 export class PaletteController {
   private colorPicker: ColorPicker | null = null;
+  private commandHistory: CommandHistory;
 
   constructor(
     private paletteModel: PaletteModel,
     private view: PaletteEditor,
-    colorPicker?: ColorPicker
+    colorPicker?: ColorPicker,
+    commandHistory?: CommandHistory
   ) {
     if (colorPicker) {
       this.colorPicker = colorPicker;
     }
 
+    this.commandHistory = commandHistory || new CommandHistory();
     this.setupViews();
     this.attachViewListeners();
   }
@@ -126,8 +131,16 @@ export class PaletteController {
     }>;
     const { paletteIdx, colorIdx, r, g, b } = customEvent.detail;
 
-    // Update the Model - this will trigger View re-render via events
-    this.paletteModel.setColor(paletteIdx, colorIdx, r, g, b);
+    // Execute command - this will update the Model and trigger View re-render via events
+    const command = new SetColorCommand(
+      this.paletteModel,
+      paletteIdx,
+      colorIdx,
+      r,
+      g,
+      b
+    );
+    this.commandHistory.executeCommand(command);
   };
 
   /**
@@ -168,6 +181,41 @@ export class PaletteController {
    */
   public getActiveSubPalette(): number {
     return this.paletteModel.getActiveSubPalette();
+  }
+
+  /**
+   * Undo the last action
+   */
+  public undo(): void {
+    this.commandHistory.undo();
+  }
+
+  /**
+   * Redo the last undone action
+   */
+  public redo(): void {
+    this.commandHistory.redo();
+  }
+
+  /**
+   * Check if undo is available
+   */
+  public canUndo(): boolean {
+    return this.commandHistory.canUndo();
+  }
+
+  /**
+   * Check if redo is available
+   */
+  public canRedo(): boolean {
+    return this.commandHistory.canRedo();
+  }
+
+  /**
+   * Get the command history instance
+   */
+  public getCommandHistory(): CommandHistory {
+    return this.commandHistory;
   }
 
   /**
