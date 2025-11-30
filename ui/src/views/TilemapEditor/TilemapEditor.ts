@@ -61,6 +61,9 @@ export class TilemapEditor extends HTMLElement {
   private scrollY: number = 0;
   private tileSize: number = 16; // Pixels per tile for display
   private isPlacing: boolean = false;
+  private rafPending: boolean = false; // Tracks if a redraw is already scheduled
+  private dirtyTiles: Set<string> = new Set(); // Track which tiles need rerendering
+  private fullRedrawNeeded: boolean = false; // Flag for full redraws
 
   constructor() {
     super();
@@ -96,53 +99,97 @@ export class TilemapEditor extends HTMLElement {
     this.paletteModel = paletteModel;
 
     // Subscribe to model events
-    this.tilemapModel.on("entryChanged", this.handleModelChange);
-    this.tilemapModel.on("tilemapResized", this.handleModelChange);
-    this.tilemapModel.on("tilemapCleared", this.handleModelChange);
-    this.tilemapModel.on("tilemapFilled", this.handleModelChange);
-    this.tilemapModel.on("tilemapImported", this.handleModelChange);
+    this.tilemapModel.on("entryChanged", this.handleEntryChanged);
+    this.tilemapModel.on("tilemapResized", this.handleFullRedraw);
+    this.tilemapModel.on("tilemapCleared", this.handleFullRedraw);
+    this.tilemapModel.on("tilemapFilled", this.handleFullRedraw);
+    this.tilemapModel.on("tilemapImported", this.handleFullRedraw);
 
-    this.tileBankModel.on("tileChanged", this.handleModelChange);
-    this.tileBankModel.on("tileAdded", this.handleModelChange);
-    this.tileBankModel.on("tileDeleted", this.handleModelChange);
+    this.tileBankModel.on("tileChanged", this.handleFullRedraw);
+    this.tileBankModel.on("tileAdded", this.handleFullRedraw);
+    this.tileBankModel.on("tileDeleted", this.handleFullRedraw);
 
-    this.paletteModel.on("colorChanged", this.handleModelChange);
-    this.paletteModel.on("paletteImported", this.handleModelChange);
-    this.paletteModel.on("subPaletteChanged", this.handleModelChange);
+    this.paletteModel.on("colorChanged", this.handleFullRedraw);
+    this.paletteModel.on("paletteImported", this.handleFullRedraw);
+    this.paletteModel.on("subPaletteChanged", this.handleFullRedraw);
 
     // Initial render
-    this.redraw();
+    this.fullRedrawNeeded = true;
+    this.scheduleRedraw();
   }
 
   /**
-   * Handle model change events - trigger re-render
+   * Handle individual tile entry changes (optimized)
    */
-  private handleModelChange = (): void => {
-    this.redraw();
+  private handleEntryChanged = (data: { x: number; y: number }): void => {
+    this.dirtyTiles.add(`${data.x},${data.y}`);
+    this.scheduleRedraw();
   };
+
+  /**
+   * Handle events that require full redraw
+   */
+  private handleFullRedraw = (): void => {
+    this.fullRedrawNeeded = true;
+    this.dirtyTiles.clear();
+    this.scheduleRedraw();
+  };
+
+  /**
+   * Schedule a redraw using requestAnimationFrame
+   * Multiple calls within the same frame will only trigger one redraw
+   */
+  private scheduleRedraw(): void {
+    if (this.rafPending) {
+      return;
+    }
+
+    this.rafPending = true;
+    requestAnimationFrame(() => {
+      this.rafPending = false;
+      this.performRedraw();
+    });
+  }
+
+  /**
+   * Perform the actual redraw - either incremental or full
+   */
+  private performRedraw(): void {
+    if (this.fullRedrawNeeded) {
+      this.redraw();
+      this.fullRedrawNeeded = false;
+    } else if (this.dirtyTiles.size > 0) {
+      // Incremental redraw - only redraw changed tiles
+      for (const key of this.dirtyTiles) {
+        const [x, y] = key.split(',').map(Number);
+        this.renderTile(x, y);
+      }
+      this.dirtyTiles.clear();
+    }
+  }
 
   /**
    * Cleanup model listeners
    */
   private cleanup(): void {
     if (this.tilemapModel) {
-      this.tilemapModel.off("entryChanged", this.handleModelChange);
-      this.tilemapModel.off("tilemapResized", this.handleModelChange);
-      this.tilemapModel.off("tilemapCleared", this.handleModelChange);
-      this.tilemapModel.off("tilemapFilled", this.handleModelChange);
-      this.tilemapModel.off("tilemapImported", this.handleModelChange);
+      this.tilemapModel.off("entryChanged", this.handleEntryChanged);
+      this.tilemapModel.off("tilemapResized", this.handleFullRedraw);
+      this.tilemapModel.off("tilemapCleared", this.handleFullRedraw);
+      this.tilemapModel.off("tilemapFilled", this.handleFullRedraw);
+      this.tilemapModel.off("tilemapImported", this.handleFullRedraw);
     }
 
     if (this.tileBankModel) {
-      this.tileBankModel.off("tileChanged", this.handleModelChange);
-      this.tileBankModel.off("tileAdded", this.handleModelChange);
-      this.tileBankModel.off("tileDeleted", this.handleModelChange);
+      this.tileBankModel.off("tileChanged", this.handleFullRedraw);
+      this.tileBankModel.off("tileAdded", this.handleFullRedraw);
+      this.tileBankModel.off("tileDeleted", this.handleFullRedraw);
     }
 
     if (this.paletteModel) {
-      this.paletteModel.off("colorChanged", this.handleModelChange);
-      this.paletteModel.off("paletteImported", this.handleModelChange);
-      this.paletteModel.off("subPaletteChanged", this.handleModelChange);
+      this.paletteModel.off("colorChanged", this.handleFullRedraw);
+      this.paletteModel.off("paletteImported", this.handleFullRedraw);
+      this.paletteModel.off("subPaletteChanged", this.handleFullRedraw);
     }
   }
 
@@ -209,6 +256,7 @@ export class TilemapEditor extends HTMLElement {
 
   /**
    * Render a single tile from the tilemap
+   * Optimized using ImageData for faster rendering
    */
   private renderTile(tilemapX: number, tilemapY: number): void {
     if (!this.ctx || !this.tilemapModel || !this.tileBankModel || !this.paletteModel) {
@@ -225,8 +273,33 @@ export class TilemapEditor extends HTMLElement {
     const screenX = tilemapX * this.tileSize - this.scrollX;
     const screenY = tilemapY * this.tileSize - this.scrollY;
 
-    // Render each pixel of the tile
     const pixelSize = this.tileSize / 8;
+
+    // For small pixel sizes, use direct fillRect (faster for tiny pixels)
+    if (pixelSize <= 2) {
+      for (let py = 0; py < 8; py++) {
+        for (let px = 0; px < 8; px++) {
+          const actualPx = entry.hFlip ? (7 - px) : px;
+          const actualPy = entry.vFlip ? (7 - py) : py;
+
+          const colorIndex = tile.getPixel(actualPx, actualPy);
+          const color = this.paletteModel.getColor(entry.paletteIdx, colorIndex);
+
+          this.ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+          this.ctx.fillRect(
+            screenX + px * pixelSize,
+            screenY + py * pixelSize,
+            pixelSize,
+            pixelSize
+          );
+        }
+      }
+      return;
+    }
+
+    // For larger pixel sizes, use ImageData (much faster)
+    const imageData = this.ctx.createImageData(this.tileSize, this.tileSize);
+    const data = imageData.data;
 
     for (let py = 0; py < 8; py++) {
       for (let px = 0; px < 8; px++) {
@@ -237,15 +310,25 @@ export class TilemapEditor extends HTMLElement {
         const colorIndex = tile.getPixel(actualPx, actualPy);
         const color = this.paletteModel.getColor(entry.paletteIdx, colorIndex);
 
-        this.ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        this.ctx.fillRect(
-          screenX + px * pixelSize,
-          screenY + py * pixelSize,
-          pixelSize,
-          pixelSize
-        );
+        // Fill the pixel block in ImageData
+        const startPixelX = Math.floor(px * pixelSize);
+        const startPixelY = Math.floor(py * pixelSize);
+        const endPixelX = Math.floor((px + 1) * pixelSize);
+        const endPixelY = Math.floor((py + 1) * pixelSize);
+
+        for (let y = startPixelY; y < endPixelY; y++) {
+          for (let x = startPixelX; x < endPixelX; x++) {
+            const idx = (y * this.tileSize + x) * 4;
+            data[idx] = color.r;
+            data[idx + 1] = color.g;
+            data[idx + 2] = color.b;
+            data[idx + 3] = 255; // Alpha
+          }
+        }
       }
     }
+
+    this.ctx.putImageData(imageData, screenX, screenY);
   }
 
   /**

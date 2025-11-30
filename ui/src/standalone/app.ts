@@ -681,6 +681,33 @@ async function main() {
       });
     }
 
+    // Bulk export - all as binary
+    const btnExportAllBin = document.getElementById("export-all-bin");
+    if (btnExportAllBin) {
+      btnExportAllBin.addEventListener("click", async () => {
+        const name = fileController.getCurrentProjectName();
+        await fileController.exportAllAsZip('bin', name);
+      });
+    }
+
+    // Bulk export - all as C headers
+    const btnExportAllH = document.getElementById("export-all-h");
+    if (btnExportAllH) {
+      btnExportAllH.addEventListener("click", async () => {
+        const name = fileController.getCurrentProjectName();
+        await fileController.exportAllAsZip('h', name);
+      });
+    }
+
+    // Bulk export - all as Assembly
+    const btnExportAllAsm = document.getElementById("export-all-asm");
+    if (btnExportAllAsm) {
+      btnExportAllAsm.addEventListener("click", async () => {
+        const name = fileController.getCurrentProjectName();
+        await fileController.exportAllAsZip('asm', name);
+      });
+    }
+
     // Export dialog - close button
     const btnExportClose = document.getElementById("export-close");
     if (btnExportClose) {

@@ -39,6 +39,7 @@ import type { PaletteModel } from "../../models/PaletteModel.js";
 export class TileBank extends HTMLElement {
   private tileBankModel: TileBankModel | null = null;
   private paletteModel: PaletteModel | null = null;
+  private rafPending: boolean = false;
   private container: HTMLElement | null = null;
 
   constructor() {
@@ -64,11 +65,11 @@ export class TileBank extends HTMLElement {
     this.paletteModel = paletteModel;
 
     // Subscribe to TileBankModel events
-    this.tileBankModel.on("tileAdded", this.handleModelChange);
-    this.tileBankModel.on("tileDeleted", this.handleModelChange);
+    this.tileBankModel.on("tileAdded", this.handleTileAdded);
+    this.tileBankModel.on("tileDeleted", this.handleTileDeleted);
     this.tileBankModel.on("activeTileChanged", this.handleModelChange);
     this.tileBankModel.on("tileBankCleared", this.handleModelChange);
-    this.tileBankModel.on("tilesImported", this.handleModelChange);
+    this.tileBankModel.on("tilesImported", this.handleTilesImported);
 
     // Subscribe to PaletteModel events (for re-rendering thumbnails)
     this.paletteModel.on("colorChanged", this.handleModelChange);
@@ -82,16 +83,16 @@ export class TileBank extends HTMLElement {
       tileModel.on("tileCleared", this.handleModelChange);
     }
 
-    this.redraw();
+    this.scheduleRedraw();
   }
 
   private cleanupModelListeners(): void {
     if (this.tileBankModel) {
-      this.tileBankModel.off("tileAdded", this.handleModelChange);
-      this.tileBankModel.off("tileDeleted", this.handleModelChange);
+      this.tileBankModel.off("tileAdded", this.handleTileAdded);
+      this.tileBankModel.off("tileDeleted", this.handleTileDeleted);
       this.tileBankModel.off("activeTileChanged", this.handleModelChange);
       this.tileBankModel.off("tileBankCleared", this.handleModelChange);
-      this.tileBankModel.off("tilesImported", this.handleModelChange);
+      this.tileBankModel.off("tilesImported", this.handleTilesImported);
 
       // Unsubscribe from TileModel events
       for (const tileModel of this.tileBankModel.getAllTiles()) {
@@ -109,8 +110,77 @@ export class TileBank extends HTMLElement {
   }
 
   private handleModelChange = (): void => {
-    this.redraw();
+    this.scheduleRedraw();
   };
+
+  /**
+   * Handle tile added - subscribe to new tile's events
+   */
+  private handleTileAdded = (data: { index: number }): void => {
+    if (!this.tileBankModel) return;
+
+    const tileModel = this.tileBankModel.getTile(data.index);
+    if (tileModel) {
+      tileModel.on("pixelChanged", this.handleModelChange);
+      tileModel.on("tileImported", this.handleModelChange);
+      tileModel.on("tileCleared", this.handleModelChange);
+    }
+
+    this.scheduleRedraw();
+  };
+
+  /**
+   * Handle tile deleted - unsubscribe from deleted tile's events
+   */
+  private handleTileDeleted = (data: { index: number; tile: any }): void => {
+    // The deleted tile is passed in the event data
+    if (data.tile) {
+      data.tile.off("pixelChanged", this.handleModelChange);
+      data.tile.off("tileImported", this.handleModelChange);
+      data.tile.off("tileCleared", this.handleModelChange);
+    }
+
+    this.scheduleRedraw();
+  };
+
+  /**
+   * Handle tiles imported - resubscribe to all tile events
+   */
+  private handleTilesImported = (): void => {
+    if (!this.tileBankModel) return;
+
+    // Unsubscribe from old tiles
+    for (const tileModel of this.tileBankModel.getAllTiles()) {
+      tileModel.off("pixelChanged", this.handleModelChange);
+      tileModel.off("tileImported", this.handleModelChange);
+      tileModel.off("tileCleared", this.handleModelChange);
+    }
+
+    // Subscribe to all current tiles
+    for (const tileModel of this.tileBankModel.getAllTiles()) {
+      tileModel.on("pixelChanged", this.handleModelChange);
+      tileModel.on("tileImported", this.handleModelChange);
+      tileModel.on("tileCleared", this.handleModelChange);
+    }
+
+    this.scheduleRedraw();
+  };
+
+  /**
+   * Schedule a redraw using requestAnimationFrame
+   * Multiple calls within the same frame will only trigger one redraw
+   */
+  private scheduleRedraw(): void {
+    if (this.rafPending) {
+      return;
+    }
+
+    this.rafPending = true;
+    requestAnimationFrame(() => {
+      this.rafPending = false;
+      this.redraw();
+    });
+  }
 
   private render(): void {
     if (!this.shadowRoot) return;

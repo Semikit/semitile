@@ -22,6 +22,7 @@ import { PaletteModel } from "../models/PaletteModel.js";
 import { TilemapBankModel } from "../models/TilemapBankModel.js";
 import { ExportManager } from "../lib/ExportManager.js";
 import { getStorage, type ProjectData } from "../lib/storage.js";
+import JSZip from "jszip";
 
 /**
  * FileController - Business logic for file operations
@@ -49,7 +50,7 @@ export class FileController {
   constructor(
     private tileBankModel: TileBankModel,
     private paletteModel: PaletteModel,
-    private tilemapBankModel?: TilemapBankModel
+    private tilemapBankModel?: TilemapBankModel,
   ) {}
 
   /**
@@ -64,7 +65,9 @@ export class FileController {
     const paletteBinary = this.paletteModel.exportBinary();
 
     // Encode all tilemaps to base64
-    let tilemapsData: Array<{ width: number; height: number; data: string }> | undefined = undefined;
+    let tilemapsData:
+      | Array<{ width: number; height: number; data: string }>
+      | undefined = undefined;
     let activeTilemapIndex: number | undefined = undefined;
     if (this.tilemapBankModel) {
       const allTilemaps = this.tilemapBankModel.exportAllTilemaps();
@@ -96,7 +99,7 @@ export class FileController {
     this.currentProjectName = projectName;
 
     console.log(
-      `[FileController] Project saved: ${projectName} (${tilesBase64.length} tiles, ${tilemapsData?.length || 0} tilemaps)`
+      `[FileController] Project saved: ${projectName} (${tilesBase64.length} tiles, ${tilemapsData?.length || 0} tilemaps)`,
     );
   }
 
@@ -114,7 +117,7 @@ export class FileController {
 
     // Decode tiles from base64
     const tiles = projectData.tiles.map((tileBase64) =>
-      this.base64ToArray(tileBase64)
+      this.base64ToArray(tileBase64),
     );
     const paletteBinary = this.base64ToArray(projectData.palette.binary);
 
@@ -159,7 +162,7 @@ export class FileController {
     this.currentProjectName = name;
 
     console.log(
-      `[FileController] Project loaded: ${name} (${tiles.length} tiles, ${projectData.tilemaps?.length || 0} tilemaps)`
+      `[FileController] Project loaded: ${name} (${tiles.length} tiles, ${projectData.tilemaps?.length || 0} tilemaps)`,
     );
     return true;
   }
@@ -192,12 +195,10 @@ export class FileController {
   }
 
   /**
-   * Export all tiles to a single binary file (.bin)
+   * Generate all tiles binary data
    */
-  exportAllTilesBinary(filename: string = "tiles.bin"): void {
+  private generateAllTilesBinary(): Uint8Array {
     const allTiles = this.tileBankModel.exportAllTiles();
-
-    // Concatenate all tile data (32 bytes each)
     const totalSize = allTiles.length * 32;
     const combined = new Uint8Array(totalSize);
 
@@ -205,8 +206,18 @@ export class FileController {
       combined.set(tileData, index * 32);
     });
 
+    return combined;
+  }
+
+  /**
+   * Export all tiles to a single binary file (.bin)
+   */
+  exportAllTilesBinary(filename: string = "tiles.bin"): void {
+    const combined = this.generateAllTilesBinary();
     ExportManager.downloadFile(combined, filename);
-    console.log(`[FileController] Exported ${allTiles.length} tiles to binary: ${filename}`);
+    console.log(
+      `[FileController] Exported ${combined.length / 32} tiles to binary: ${filename}`,
+    );
   }
 
   /**
@@ -230,11 +241,10 @@ export class FileController {
   }
 
   /**
-   * Export all tiles to a single C header file (.h)
+   * Generate all tiles C header data
    */
-  exportAllTilesCHeader(filename: string = "tiles.h"): void {
+  private generateAllTilesCHeader(name: string): string {
     const allTiles = this.tileBankModel.getAllTiles();
-    const name = filename.replace(/\.h$/, "");
     const variableName = this.sanitizeName(name);
 
     let header = `// Tile bank data: ${name}\n`;
@@ -267,8 +277,17 @@ export class FileController {
     header += `};\n\n`;
     header += `#endif // TILES_${variableName.toUpperCase()}_H\n`;
 
+    return header;
+  }
+
+  /**
+   * Export all tiles to a single C header file (.h)
+   */
+  exportAllTilesCHeader(filename: string = "tiles.h"): void {
+    const name = filename.replace(/\.h$/, "");
+    const header = this.generateAllTilesCHeader(name);
     ExportManager.downloadFile(header, filename);
-    console.log(`[FileController] Exported ${allTiles.length} tiles to C header: ${filename}`);
+    console.log(`[FileController] Exported tiles to C header: ${filename}`);
   }
 
   private sanitizeName(name: string): string {
@@ -288,7 +307,10 @@ export class FileController {
    */
   exportPaletteCHeader(filename: string = "palette.h"): void {
     const name = filename.replace(/\.h$/, "");
-    const header = ExportManager.generatePaletteCHeader(this.paletteModel, name);
+    const header = ExportManager.generatePaletteCHeader(
+      this.paletteModel,
+      name,
+    );
     ExportManager.downloadFile(header, filename);
     console.log(`[FileController] Exported palette C header: ${filename}`);
   }
@@ -305,17 +327,16 @@ export class FileController {
   }
 
   /**
-   * Export all tiles to a single Assembly file (.asm)
+   * Generate all tiles Assembly data
    */
-  exportAllTilesASM(filename: string = "tiles.asm"): void {
+  private generateAllTilesASM(name: string): string {
     const allTiles = this.tileBankModel.getAllTiles();
-    const name = filename.replace(/\.asm$/, "");
     const labelName = this.sanitizeName(name);
 
     let asm = `; Tile bank data: ${name}\n`;
     asm += `; ${allTiles.length} tiles, 8x8 pixels each, 4bpp planar format\n`;
     asm += `; Generated by Semitile\n\n`;
-    asm += `${labelName}_count .equ ${allTiles.length}\n\n`;
+    asm += `.define ${labelName}_count ${allTiles.length}\n\n`;
     asm += `${labelName}:\n`;
 
     allTiles.forEach((tile, tileIndex) => {
@@ -324,7 +345,7 @@ export class FileController {
 
       for (let i = 0; i < 4; i++) {
         asm += `    ; Plane ${i}\n`;
-        asm += `    .db `;
+        asm += `    .byte `;
         for (let j = 0; j < 8; j++) {
           const byte = data[i * 8 + j];
           asm += `$${byte.toString(16).toUpperCase().padStart(2, "0")}`;
@@ -338,8 +359,17 @@ export class FileController {
       }
     });
 
+    return asm;
+  }
+
+  /**
+   * Export all tiles to a single Assembly file (.asm)
+   */
+  exportAllTilesASM(filename: string = "tiles.asm"): void {
+    const name = filename.replace(/\.asm$/, "");
+    const asm = this.generateAllTilesASM(name);
     ExportManager.downloadFile(asm, filename);
-    console.log(`[FileController] Exported ${allTiles.length} tiles to ASM: ${filename}`);
+    console.log(`[FileController] Exported tiles to ASM: ${filename}`);
   }
 
   /**
@@ -376,7 +406,9 @@ export class FileController {
 
     const json = JSON.stringify(projectData, null, 2);
     ExportManager.downloadFile(json, filename, "application/json");
-    console.log(`[FileController] Exported project JSON: ${filename} (${tilesBase64.length} tiles)`);
+    console.log(
+      `[FileController] Exported project JSON: ${filename} (${tilesBase64.length} tiles)`,
+    );
   }
 
   /**
@@ -389,7 +421,7 @@ export class FileController {
 
       // Decode tiles and palette
       const tiles = projectData.tiles.map((tileBase64) =>
-        this.base64ToArray(tileBase64)
+        this.base64ToArray(tileBase64),
       );
       const paletteBinary = this.base64ToArray(projectData.palette.binary);
 
@@ -412,7 +444,9 @@ export class FileController {
       }
 
       this.currentProjectName = projectData.name;
-      console.log(`[FileController] Imported project: ${projectData.name} (${tiles.length} tiles)`);
+      console.log(
+        `[FileController] Imported project: ${projectData.name} (${tiles.length} tiles)`,
+      );
       return true;
     } catch (error) {
       console.error(`[FileController] Failed to import project:`, error);
@@ -430,7 +464,7 @@ export class FileController {
 
       if (data.length !== 32) {
         console.error(
-          `[FileController] Invalid tile binary size: ${data.length} (expected 32)`
+          `[FileController] Invalid tile binary size: ${data.length} (expected 32)`,
         );
         return false;
       }
@@ -457,7 +491,7 @@ export class FileController {
 
       if (data.length !== 512) {
         console.error(
-          `[FileController] Invalid palette binary size: ${data.length} (expected 512)`
+          `[FileController] Invalid palette binary size: ${data.length} (expected 512)`,
         );
         return false;
       }
@@ -523,21 +557,14 @@ export class FileController {
     const data = tilemap.exportBinary();
     ExportManager.downloadFile(data, filename);
     console.log(
-      `[FileController] Exported tilemap binary: ${filename} (${tilemap.getWidth()}x${tilemap.getHeight()})`
+      `[FileController] Exported tilemap binary: ${filename} (${tilemap.getWidth()}x${tilemap.getHeight()})`,
     );
   }
 
   /**
-   * Export active tilemap to C header (.h)
+   * Generate tilemap C header data
    */
-  exportTilemapCHeader(filename: string = "tilemap.h"): void {
-    if (!this.tilemapBankModel) {
-      console.error("[FileController] No tilemap bank model available");
-      return;
-    }
-
-    const tilemap = this.tilemapBankModel.getActiveTilemap();
-    const name = filename.replace(/\.h$/, "");
+  private generateTilemapCHeader(tilemap: any, name: string): string {
     const variableName = this.sanitizeName(name);
     const width = tilemap.getWidth();
     const height = tilemap.getHeight();
@@ -574,21 +601,29 @@ export class FileController {
     header += `\n};\n\n`;
     header += `#endif // TILEMAP_${variableName.toUpperCase()}_H\n`;
 
-    ExportManager.downloadFile(header, filename);
-    console.log(`[FileController] Exported tilemap C header: ${filename}`);
+    return header;
   }
 
   /**
-   * Export active tilemap to Assembly file (.asm)
+   * Export active tilemap to C header (.h)
    */
-  exportTilemapASM(filename: string = "tilemap.asm"): void {
+  exportTilemapCHeader(filename: string = "tilemap.h"): void {
     if (!this.tilemapBankModel) {
       console.error("[FileController] No tilemap bank model available");
       return;
     }
 
     const tilemap = this.tilemapBankModel.getActiveTilemap();
-    const name = filename.replace(/\.asm$/, "");
+    const name = filename.replace(/\.h$/, "");
+    const header = this.generateTilemapCHeader(tilemap, name);
+    ExportManager.downloadFile(header, filename);
+    console.log(`[FileController] Exported tilemap C header: ${filename}`);
+  }
+
+  /**
+   * Generate tilemap Assembly data
+   */
+  private generateTilemapASM(tilemap: any, name: string): string {
     const labelName = this.sanitizeName(name);
     const width = tilemap.getWidth();
     const height = tilemap.getHeight();
@@ -597,13 +632,13 @@ export class FileController {
     let asm = `; Tilemap data: ${name}\n`;
     asm += `; ${width}x${height} tiles, 2 bytes per entry\n`;
     asm += `; Generated by Semitile\n\n`;
-    asm += `${labelName}_width .equ ${width}\n`;
-    asm += `${labelName}_height .equ ${height}\n\n`;
+    asm += `.define ${labelName}_width ${width}\n`;
+    asm += `.define ${labelName}_height ${height}\n\n`;
     asm += `${labelName}:\n`;
 
     // Write tilemap entries (16-bit values)
     for (let i = 0; i < data.length; i += 32) {
-      asm += "    .dw ";
+      asm += "    .word ";
       const end = Math.min(i + 32, data.length);
 
       for (let j = i; j < end; j += 2) {
@@ -620,7 +655,110 @@ export class FileController {
       asm += "\n";
     }
 
+    return asm;
+  }
+
+  /**
+   * Export active tilemap to Assembly file (.asm)
+   */
+  exportTilemapASM(filename: string = "tilemap.asm"): void {
+    if (!this.tilemapBankModel) {
+      console.error("[FileController] No tilemap bank model available");
+      return;
+    }
+
+    const tilemap = this.tilemapBankModel.getActiveTilemap();
+    const name = filename.replace(/\.asm$/, "");
+    const asm = this.generateTilemapASM(tilemap, name);
     ExportManager.downloadFile(asm, filename);
     console.log(`[FileController] Exported tilemap ASM: ${filename}`);
+  }
+
+  /**
+   * Export all project data as a compressed zip file
+   *
+   * Creates a zip containing:
+   * - All tiles in a single file (tiles.bin/h/asm)
+   * - Palette in a single file (palette.bin/h/asm)
+   * - Each tilemap in individual files (tilemap_0.bin/h/asm, tilemap_1.bin/h/asm, etc.)
+   *
+   * @param format - Export format: 'bin', 'h', or 'asm'
+   * @param projectName - Name for the project (used in filenames)
+   */
+  async exportAllAsZip(
+    format: "bin" | "h" | "asm",
+    projectName?: string,
+  ): Promise<void> {
+    const name = projectName || this.currentProjectName;
+    const zip = new JSZip();
+
+    // Determine file extension
+    const ext = format === "bin" ? "bin" : format === "h" ? "h" : "asm";
+
+    // 1. Export all tiles to a single file
+    if (format === "bin") {
+      zip.file(`tiles.${ext}`, this.generateAllTilesBinary());
+    } else if (format === "h") {
+      zip.file(`tiles.${ext}`, this.generateAllTilesCHeader("tiles"));
+    } else {
+      zip.file(`tiles.${ext}`, this.generateAllTilesASM("tiles"));
+    }
+
+    // 2. Export palette
+    if (format === "bin") {
+      zip.file(
+        `palette.${ext}`,
+        ExportManager.exportPaletteBinary(this.paletteModel),
+      );
+    } else if (format === "h") {
+      zip.file(
+        `palette.${ext}`,
+        ExportManager.generatePaletteCHeader(this.paletteModel, "palette"),
+      );
+    } else {
+      zip.file(
+        `palette.${ext}`,
+        ExportManager.generatePaletteASM(this.paletteModel, "palette"),
+      );
+    }
+
+    // 3. Export each tilemap as individual files
+    if (this.tilemapBankModel) {
+      const allTilemaps = this.tilemapBankModel.getAllTilemaps();
+
+      allTilemaps.forEach((tilemap, index) => {
+        const tilemapName = `tilemap_${index}`;
+
+        if (format === "bin") {
+          zip.file(`${tilemapName}.${ext}`, tilemap.exportBinary());
+        } else if (format === "h") {
+          zip.file(
+            `${tilemapName}.${ext}`,
+            this.generateTilemapCHeader(tilemap, tilemapName),
+          );
+        } else {
+          zip.file(
+            `${tilemapName}.${ext}`,
+            this.generateTilemapASM(tilemap, tilemapName),
+          );
+        }
+      });
+    }
+
+    // Generate zip file and download
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name}_export.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const tilemapCount = this.tilemapBankModel?.getAllTilemaps().length || 0;
+    console.log(
+      `[FileController] Exported all project data as ${format.toUpperCase()} in zip: ${name}_export.zip (tiles + palette + ${tilemapCount} tilemaps)`,
+    );
   }
 }

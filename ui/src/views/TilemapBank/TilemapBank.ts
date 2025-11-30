@@ -45,6 +45,7 @@ import styles from "./TilemapBank.css?inline";
  */
 export class TilemapBank extends HTMLElement {
   private tilemapBankModel: TilemapBankModel | null = null;
+  private rafPending: boolean = false;
 
   constructor() {
     super();
@@ -73,15 +74,32 @@ export class TilemapBank extends HTMLElement {
     this.tilemapBankModel.on("activeTilemapChanged", this.handleModelChange);
     this.tilemapBankModel.on("tilemapDuplicated", this.handleModelChange);
 
-    this.render();
+    this.scheduleRender();
   }
 
   /**
    * Handle model change - trigger re-render
+   * Uses requestAnimationFrame to batch multiple rapid changes
    */
   private handleModelChange = (): void => {
-    this.render();
+    this.scheduleRender();
   };
+
+  /**
+   * Schedule a render using requestAnimationFrame
+   * Multiple calls within the same frame will only trigger one render
+   */
+  private scheduleRender(): void {
+    if (this.rafPending) {
+      return;
+    }
+
+    this.rafPending = true;
+    requestAnimationFrame(() => {
+      this.rafPending = false;
+      this.render();
+    });
+  }
 
   /**
    * Cleanup model listeners

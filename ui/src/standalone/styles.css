@@ -362,6 +362,13 @@ body {
   margin-bottom: var(--spacing-lg);
 }
 
+.dialog-description {
+  color: var(--c16-text-secondary);
+  font-size: 0.8rem;
+  margin-bottom: var(--spacing-md);
+  font-style: italic;
+}
+
 .dialog-section {
   margin: var(--spacing-lg) 0;
 }
