@@ -1,0 +1,79 @@
+/*
+ * TileAttributesPanel Component Styles
+ */
+
+.tile-attributes-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+  padding: var(--spacing-md, 16px);
+  background: var(--c16-bg-medium, #16213e);
+  border-radius: var(--radius-md, 4px);
+  color: var(--c16-text-primary, #ffffff);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  color: var(--c16-primary, #00ff88);
+}
+
+.attribute-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
+}
+
+.attribute-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  color: var(--c16-text-secondary, #b8b8b8);
+}
+
+.palette-select {
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  background: var(--c16-bg-dark, #1a1a2e);
+  color: var(--c16-text-primary, #ffffff);
+  border: 1px solid var(--c16-bg-light, #0f3460);
+  border-radius: var(--radius-sm, 2px);
+  font-size: var(--text-sm, 13px);
+  font-family: var(--font-mono, "SF Mono", monospace);
+  cursor: pointer;
+  outline: none;
+}
+
+.palette-select:hover {
+  border-color: var(--c16-primary, #00ff88);
+}
+
+.palette-select:focus {
+  border-color: var(--c16-primary, #00ff88);
+  box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.2);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  font-size: var(--text-sm, 13px);
+  color: var(--c16-text-primary, #ffffff);
+  cursor: pointer;
+  user-select: none;
+}
+
+.flip-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--c16-primary, #00ff88);
+}
+
+.flip-checkbox:focus {
+  outline: 2px solid var(--c16-primary, #00ff88);
+  outline-offset: 2px;
+}
+
+.checkbox-label:hover span {
+  color: var(--c16-primary, #00ff88);
+}
