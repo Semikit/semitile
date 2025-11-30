@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { TileModel } from "../models/TileModel.js";
+import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { EditorState, Tool } from "../models/EditorState.js";
 import type { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
@@ -46,7 +46,7 @@ import {
  * Usage:
  * ```typescript
  * const controller = new TileEditorController(
- *   tileModel,
+ *   tileBankModel,
  *   paletteModel,
  *   editorState,
  *   tileCanvasView
@@ -64,7 +64,7 @@ export class TileEditorController {
   private commandHistory: CommandHistory;
 
   constructor(
-    private tileModel: TileModel,
+    private tileBankModel: TileBankModel,
     private paletteModel: PaletteModel,
     private editorState: EditorState,
     private view: TileCanvas,
@@ -73,14 +73,32 @@ export class TileEditorController {
     this.commandHistory = commandHistory || new CommandHistory();
     this.setupView();
     this.attachViewListeners();
+    this.attachTileBankListeners();
   }
 
   /**
    * Inject Models into View to wire up the MVC connection
    */
   private setupView(): void {
-    this.view.setModels(this.tileModel, this.paletteModel, this.editorState);
+    const activeTile = this.tileBankModel.getActiveTile();
+    this.view.setModels(activeTile, this.paletteModel, this.editorState);
   }
+
+  /**
+   * Listen to TileBankModel events to update View when active tile changes
+   */
+  private attachTileBankListeners(): void {
+    this.tileBankModel.on("activeTileChanged", this.handleActiveTileChanged);
+  }
+
+  /**
+   * Handle active tile change - update the View to point to the new active tile
+   */
+  private handleActiveTileChanged = (): void => {
+    const activeTile = this.tileBankModel.getActiveTile();
+    this.view.setModels(activeTile, this.paletteModel, this.editorState);
+    console.log("[TileEditorController] Active tile changed, View updated");
+  };
 
   /**
    * Attach listeners to View events
@@ -157,8 +175,9 @@ export class TileEditorController {
    * Draw a single pixel with the selected color
    */
   private drawPixel(x: number, y: number): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const colorIndex = this.paletteModel.getSelectedColorIndex();
-    const command = new SetPixelCommand(this.tileModel, x, y, colorIndex);
+    const command = new SetPixelCommand(activeTile, x, y, colorIndex);
     this.commandHistory.executeCommand(command);
   }
 
@@ -168,8 +187,9 @@ export class TileEditorController {
    * Fills all connected pixels of the same color with the selected color.
    */
   private floodFill(startX: number, startY: number): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const newColor = this.paletteModel.getSelectedColorIndex();
-    const command = new FillCommand(this.tileModel, startX, startY, newColor);
+    const command = new FillCommand(activeTile, startX, startY, newColor);
     this.commandHistory.executeCommand(command);
   }
 
@@ -177,8 +197,9 @@ export class TileEditorController {
    * Draw a line using Bresenham's line algorithm
    */
   private drawLine(x0: number, y0: number, x1: number, y1: number): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const colorIndex = this.paletteModel.getSelectedColorIndex();
-    const command = new LineCommand(this.tileModel, x0, y0, x1, y1, colorIndex);
+    const command = new LineCommand(activeTile, x0, y0, x1, y1, colorIndex);
     this.commandHistory.executeCommand(command);
   }
 
@@ -186,9 +207,10 @@ export class TileEditorController {
    * Draw a filled rectangle
    */
   private drawRectangle(x0: number, y0: number, x1: number, y1: number): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const colorIndex = this.paletteModel.getSelectedColorIndex();
     const command = new RectangleCommand(
-      this.tileModel,
+      activeTile,
       x0,
       y0,
       x1,
@@ -199,12 +221,13 @@ export class TileEditorController {
   }
 
   /**
-   * Clear the entire tile
+   * Clear the active tile
    *
    * Public API method for external control.
    */
   public clear(): void {
-    const command = new ClearTileCommand(this.tileModel);
+    const activeTile = this.tileBankModel.getActiveTile();
+    const command = new ClearTileCommand(activeTile);
     this.commandHistory.executeCommand(command);
   }
 
@@ -252,5 +275,6 @@ export class TileEditorController {
     this.view.removeEventListener("draw-start", this.handleDrawStart);
     this.view.removeEventListener("draw-move", this.handleDrawMove);
     this.view.removeEventListener("draw-end", this.handleDrawEnd);
+    this.tileBankModel.off("activeTileChanged", this.handleActiveTileChanged);
   }
 }

@@ -25,9 +25,8 @@ export interface ProjectData {
   version: string;
   createdAt: string;
   updatedAt: string;
-  tile: {
-    planar: string; // Base64 encoded planar data
-  };
+  tiles: string[]; // Array of Base64 encoded planar data (32 bytes each)
+  activeTileIndex?: number; // Index of the active tile (optional, defaults to 0)
   palette: {
     binary: string; // Base64 encoded RGB555 data
   };

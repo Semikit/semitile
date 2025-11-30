@@ -21,7 +21,7 @@
 import { initWasm, WasmTile, WasmPalette } from "../lib/wasm-loader.js";
 
 // Models
-import { TileModel } from "../models/TileModel.js";
+import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { EditorState } from "../models/EditorState.js";
 
@@ -30,11 +30,13 @@ import { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
 import { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
 import { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
 import { ToolPanel } from "../views/ToolPanel/ToolPanel.js";
+import { TileBank } from "../views/TileBank/TileBank.js";
 
 // Controllers
 import { TileEditorController } from "../controllers/TileEditorController.js";
 import { PaletteController } from "../controllers/PaletteController.js";
 import { FileController } from "../controllers/FileController.js";
+import { TileBankController } from "../controllers/TileBankController.js";
 
 // Command History
 import { CommandHistory } from "../models/CommandHistory.js";
@@ -62,7 +64,7 @@ async function main() {
     // ===== CREATE MODELS (Single Source of Truth) =====
     console.log("[App] Creating Models...");
 
-    const tileModel = new TileModel(new WasmTile());
+    const tileBankModel = new TileBankModel(); // Starts with one empty tile
     const paletteModel = new PaletteModel(new WasmPalette());
     const editorState = new EditorState();
 
@@ -78,8 +80,9 @@ async function main() {
     const paletteEditor = document.getElementById("palette-editor") as PaletteEditor;
     const colorPicker = document.getElementById("color-picker") as ColorPicker;
     const toolPanel = document.getElementById("tool-panel") as ToolPanel;
+    const tileBank = document.getElementById("tile-bank") as TileBank;
 
-    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel) {
+    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel || !tileBank) {
       throw new Error("Failed to get View elements from DOM");
     }
 
@@ -95,7 +98,7 @@ async function main() {
 
     // Tile Editor Controller - handles tile editing
     const tileEditorController = new TileEditorController(
-      tileModel,
+      tileBankModel,
       paletteModel,
       editorState,
       tileCanvas,
@@ -110,8 +113,15 @@ async function main() {
       commandHistory
     );
 
+    // Tile Bank Controller - handles tile bank management
+    const tileBankController = new TileBankController(
+      tileBankModel,
+      paletteModel,
+      tileBank
+    );
+
     // File Controller - handles save/load/export operations
-    const fileController = new FileController(tileModel, paletteModel);
+    const fileController = new FileController(tileBankModel, paletteModel);
 
     console.log("[App] Controllers created and wired");
 

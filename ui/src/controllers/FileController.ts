@@ -17,7 +17,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import { TileModel } from "../models/TileModel.js";
+import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { ExportManager } from "../lib/ExportManager.js";
 import { getStorage, type ProjectData } from "../lib/storage.js";
@@ -33,7 +33,7 @@ import { getStorage, type ProjectData } from "../lib/storage.js";
  *
  * Usage:
  * ```typescript
- * const fileController = new FileController(tileModel, paletteModel);
+ * const fileController = new FileController(tileBankModel, paletteModel);
  *
  * // Save project
  * await fileController.saveProject("my_tile");
@@ -46,7 +46,7 @@ export class FileController {
   private currentProjectName: string = "untitled";
 
   constructor(
-    private tileModel: TileModel,
+    private tileBankModel: TileBankModel,
     private paletteModel: PaletteModel
   ) {}
 
@@ -56,8 +56,9 @@ export class FileController {
   async saveProject(name?: string): Promise<void> {
     const projectName = name || this.currentProjectName;
 
-    // Encode data to base64
-    const tilePlanar = this.tileModel.exportPlanar();
+    // Encode all tiles to base64
+    const allTiles = this.tileBankModel.exportAllTiles();
+    const tilesBase64 = allTiles.map((tile) => this.arrayToBase64(tile));
     const paletteBinary = this.paletteModel.exportBinary();
 
     const projectData: ProjectData = {
@@ -65,9 +66,8 @@ export class FileController {
       version: "1.0",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      tile: {
-        planar: this.arrayToBase64(tilePlanar),
-      },
+      tiles: tilesBase64,
+      activeTileIndex: this.tileBankModel.getActiveTileIndex(),
       palette: {
         binary: this.arrayToBase64(paletteBinary),
       },
@@ -78,7 +78,7 @@ export class FileController {
 
     this.currentProjectName = projectName;
 
-    console.log(`[FileController] Project saved: ${projectName}`);
+    console.log(`[FileController] Project saved: ${projectName} (${tilesBase64.length} tiles)`);
   }
 
   /**
@@ -93,22 +93,33 @@ export class FileController {
       return false;
     }
 
-    // Decode data from base64
-    const tilePlanar = this.base64ToArray(projectData.tile.planar);
+    // Decode tiles from base64
+    const tiles = projectData.tiles.map((tileBase64) =>
+      this.base64ToArray(tileBase64)
+    );
     const paletteBinary = this.base64ToArray(projectData.palette.binary);
 
     // Import into models
-    const tileImported = this.tileModel.importPlanar(tilePlanar);
+    this.tileBankModel.importTiles(tiles);
     const paletteImported = this.paletteModel.importBinary(paletteBinary);
 
-    if (!tileImported || !paletteImported) {
-      console.error(`[FileController] Failed to import project data`);
+    if (!paletteImported) {
+      console.error(`[FileController] Failed to import palette data`);
       return false;
+    }
+
+    // Restore active tile index
+    if (
+      projectData.activeTileIndex !== undefined &&
+      projectData.activeTileIndex >= 0 &&
+      projectData.activeTileIndex < tiles.length
+    ) {
+      this.tileBankModel.setActiveTile(projectData.activeTileIndex);
     }
 
     this.currentProjectName = name;
 
-    console.log(`[FileController] Project loaded: ${name}`);
+    console.log(`[FileController] Project loaded: ${name} (${tiles.length} tiles)`);
     return true;
   }
 
@@ -130,12 +141,13 @@ export class FileController {
   }
 
   /**
-   * Export tile to binary file (.bin)
+   * Export active tile to binary file (.bin)
    */
   exportTileBinary(filename: string = "tile.bin"): void {
-    const data = ExportManager.exportTileBinary(this.tileModel);
+    const activeTile = this.tileBankModel.getActiveTile();
+    const data = ExportManager.exportTileBinary(activeTile);
     ExportManager.downloadFile(data, filename);
-    console.log(`[FileController] Exported tile binary: ${filename}`);
+    console.log(`[FileController] Exported active tile binary: ${filename}`);
   }
 
   /**
@@ -148,13 +160,14 @@ export class FileController {
   }
 
   /**
-   * Export tile to C header (.h)
+   * Export active tile to C header (.h)
    */
   exportTileCHeader(filename: string = "tile.h"): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const name = filename.replace(/\.h$/, "");
-    const header = ExportManager.generateTileCHeader(this.tileModel, name);
+    const header = ExportManager.generateTileCHeader(activeTile, name);
     ExportManager.downloadFile(header, filename);
-    console.log(`[FileController] Exported tile C header: ${filename}`);
+    console.log(`[FileController] Exported active tile C header: ${filename}`);
   }
 
   /**
@@ -168,13 +181,14 @@ export class FileController {
   }
 
   /**
-   * Export tile to Assembly file (.asm)
+   * Export active tile to Assembly file (.asm)
    */
   exportTileASM(filename: string = "tile.asm"): void {
+    const activeTile = this.tileBankModel.getActiveTile();
     const name = filename.replace(/\.asm$/, "");
-    const asm = ExportManager.generateTileASM(this.tileModel, name);
+    const asm = ExportManager.generateTileASM(activeTile, name);
     ExportManager.downloadFile(asm, filename);
-    console.log(`[FileController] Exported tile ASM: ${filename}`);
+    console.log(`[FileController] Exported active tile ASM: ${filename}`);
   }
 
   /**
@@ -193,14 +207,17 @@ export class FileController {
   async exportProjectJSON(filename: string = "project.json"): Promise<void> {
     const projectName = filename.replace(/\.json$/, "");
 
+    // Export all tiles
+    const allTiles = this.tileBankModel.exportAllTiles();
+    const tilesBase64 = allTiles.map((tile) => this.arrayToBase64(tile));
+
     const projectData: ProjectData = {
       name: projectName,
       version: "1.0",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      tile: {
-        planar: this.arrayToBase64(this.tileModel.exportPlanar()),
-      },
+      tiles: tilesBase64,
+      activeTileIndex: this.tileBankModel.getActiveTileIndex(),
       palette: {
         binary: this.arrayToBase64(this.paletteModel.exportBinary()),
       },
@@ -208,7 +225,7 @@ export class FileController {
 
     const json = JSON.stringify(projectData, null, 2);
     ExportManager.downloadFile(json, filename, "application/json");
-    console.log(`[FileController] Exported project JSON: ${filename}`);
+    console.log(`[FileController] Exported project JSON: ${filename} (${tilesBase64.length} tiles)`);
   }
 
   /**
@@ -219,20 +236,32 @@ export class FileController {
       const text = await file.text();
       const projectData: ProjectData = JSON.parse(text);
 
-      // Decode and import data
-      const tilePlanar = this.base64ToArray(projectData.tile.planar);
+      // Decode tiles and palette
+      const tiles = projectData.tiles.map((tileBase64) =>
+        this.base64ToArray(tileBase64)
+      );
       const paletteBinary = this.base64ToArray(projectData.palette.binary);
 
-      const tileImported = this.tileModel.importPlanar(tilePlanar);
+      // Import into models
+      this.tileBankModel.importTiles(tiles);
       const paletteImported = this.paletteModel.importBinary(paletteBinary);
 
-      if (!tileImported || !paletteImported) {
-        console.error(`[FileController] Failed to import project data`);
+      if (!paletteImported) {
+        console.error(`[FileController] Failed to import palette data`);
         return false;
       }
 
+      // Restore active tile index
+      if (
+        projectData.activeTileIndex !== undefined &&
+        projectData.activeTileIndex >= 0 &&
+        projectData.activeTileIndex < tiles.length
+      ) {
+        this.tileBankModel.setActiveTile(projectData.activeTileIndex);
+      }
+
       this.currentProjectName = projectData.name;
-      console.log(`[FileController] Imported project: ${projectData.name}`);
+      console.log(`[FileController] Imported project: ${projectData.name} (${tiles.length} tiles)`);
       return true;
     } catch (error) {
       console.error(`[FileController] Failed to import project:`, error);
@@ -241,7 +270,7 @@ export class FileController {
   }
 
   /**
-   * Import tile from binary file (.bin)
+   * Import tile from binary file (.bin) into active tile
    */
   async importTileBinary(file: File): Promise<boolean> {
     try {
@@ -255,9 +284,10 @@ export class FileController {
         return false;
       }
 
-      const imported = this.tileModel.importPlanar(data);
+      const activeTile = this.tileBankModel.getActiveTile();
+      const imported = activeTile.importPlanar(data);
       if (imported) {
-        console.log(`[FileController] Imported tile binary`);
+        console.log(`[FileController] Imported tile binary into active tile`);
       }
       return imported;
     } catch (error) {
