@@ -224,13 +224,14 @@ impl WasmTilemapEntry {
     ///
     /// # Arguments
     /// * `tile_index` - Tile index (0-1023), will be clamped to 1023
-    /// * `palette_idx` - Palette index (0-15), will be clamped to 15
+    /// * `palette_idx` - Palette index (0-7), will be clamped to 7 (backgrounds use palettes 0-7)
     /// * `h_flip` - Horizontal flip flag
     /// * `v_flip` - Vertical flip flag
+    /// * `priority` - Priority flag (vs. sprites)
     #[wasm_bindgen(constructor)]
-    pub fn new(tile_index: u16, palette_idx: u8, h_flip: bool, v_flip: bool) -> Self {
+    pub fn new(tile_index: u16, palette_idx: u8, h_flip: bool, v_flip: bool, priority: bool) -> Self {
         Self {
-            inner: TilemapEntry::new(tile_index, palette_idx, h_flip, v_flip),
+            inner: TilemapEntry::new(tile_index, palette_idx, h_flip, v_flip, priority),
         }
     }
 
@@ -254,7 +255,7 @@ impl WasmTilemapEntry {
         self.inner.tile_index()
     }
 
-    /// Returns the palette index (0-15)
+    /// Returns the palette index (0-7)
     #[wasm_bindgen(js_name = paletteIdx)]
     pub fn palette_idx(&self) -> u8 {
         self.inner.palette_idx()
@@ -272,13 +273,19 @@ impl WasmTilemapEntry {
         self.inner.v_flip()
     }
 
+    /// Returns the priority flag
+    #[wasm_bindgen(js_name = priority)]
+    pub fn priority(&self) -> bool {
+        self.inner.priority()
+    }
+
     /// Sets the tile index (will be clamped to 0-1023)
     #[wasm_bindgen(js_name = setTileIndex)]
     pub fn set_tile_index(&mut self, tile_index: u16) {
         self.inner.set_tile_index(tile_index);
     }
 
-    /// Sets the palette index (will be clamped to 0-15)
+    /// Sets the palette index (will be clamped to 0-7)
     #[wasm_bindgen(js_name = setPaletteIdx)]
     pub fn set_palette_idx(&mut self, palette_idx: u8) {
         self.inner.set_palette_idx(palette_idx);
@@ -294,6 +301,12 @@ impl WasmTilemapEntry {
     #[wasm_bindgen(js_name = setVFlip)]
     pub fn set_v_flip(&mut self, v_flip: bool) {
         self.inner.set_v_flip(v_flip);
+    }
+
+    /// Sets the priority flag
+    #[wasm_bindgen(js_name = setPriority)]
+    pub fn set_priority(&mut self, priority: bool) {
+        self.inner.set_priority(priority);
     }
 }
 

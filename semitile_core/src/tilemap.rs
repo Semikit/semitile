@@ -17,17 +17,21 @@
 
 /// Represents a tilemap entry (16-bit value)
 ///
-/// Format:
-/// - Bits 0-9: Tile index (0-1023)
-/// - Bit 10: Horizontal flip
-/// - Bit 11: Vertical flip
-/// - Bits 12-15: Palette index (0-15)
+/// Format (Cicada-16 Hardware Spec):
+/// - Bit 15: Priority (vs. Sprites)
+/// - Bit 14: V-Flip
+/// - Bit 13: H-Flip
+/// - Bits 10-12: Palette index (0-7) - 3 bits
+/// - Bit 9: Tile index bit 9
+/// - Bit 8: Tile index bit 8
+/// - Bits 0-7: Tile index bits 0-7
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TilemapEntry {
     tile_index: u16, // 0-1023 (10 bits)
     h_flip: bool,
     v_flip: bool,
-    palette_idx: u8, // 0-15 (4 bits)
+    priority: bool,
+    palette_idx: u8, // 0-7 (3 bits)
 }
 
 impl TilemapEntry {
@@ -35,34 +39,41 @@ impl TilemapEntry {
     ///
     /// # Arguments
     /// * `tile_index` - Tile index (0-1023), will be clamped to 1023
-    /// * `palette_idx` - Palette index (0-15), will be clamped to 15
+    /// * `palette_idx` - Palette index (0-7), will be clamped to 7
     /// * `h_flip` - Horizontal flip flag
     /// * `v_flip` - Vertical flip flag
-    pub fn new(tile_index: u16, palette_idx: u8, h_flip: bool, v_flip: bool) -> Self {
+    /// * `priority` - Priority flag (vs. sprites)
+    pub fn new(tile_index: u16, palette_idx: u8, h_flip: bool, v_flip: bool, priority: bool) -> Self {
         Self {
             tile_index: tile_index.min(1023),
             h_flip,
             v_flip,
-            palette_idx: palette_idx.min(15),
+            priority,
+            palette_idx: palette_idx.min(7),
         }
     }
 
     /// Converts the tilemap entry to 16-bit format (little-endian)
     ///
-    /// Format: `PPPPVHIIIIIIIIII`
-    /// - Bits 0-9: Tile index (I)
-    /// - Bit 10: Horizontal flip (H)
-    /// - Bit 11: Vertical flip (V)
-    /// - Bits 12-15: Palette index (P)
+    /// Format per Cicada-16 Hardware Spec:
+    /// - Bit 15: Priority
+    /// - Bit 14: V-Flip
+    /// - Bit 13: H-Flip
+    /// - Bits 10-12: Palette index (3 bits)
+    /// - Bits 8-9: Tile index bits 8-9
+    /// - Bits 0-7: Tile index bits 0-7
     pub fn to_u16(&self) -> u16 {
-        let mut value = self.tile_index & 0x3FF; // 10 bits for tile index
+        let mut value = self.tile_index & 0x3FF; // 10 bits for tile index (bits 0-9)
+        value |= (self.palette_idx as u16 & 0x7) << 10; // 3 bits for palette (bits 10-12)
         if self.h_flip {
-            value |= 1 << 10;
+            value |= 1 << 13;
         }
         if self.v_flip {
-            value |= 1 << 11;
+            value |= 1 << 14;
         }
-        value |= (self.palette_idx as u16) << 12;
+        if self.priority {
+            value |= 1 << 15;
+        }
         value
     }
 
@@ -70,9 +81,10 @@ impl TilemapEntry {
     pub fn from_u16(value: u16) -> Self {
         Self {
             tile_index: value & 0x3FF,
-            h_flip: (value & (1 << 10)) != 0,
-            v_flip: (value & (1 << 11)) != 0,
-            palette_idx: ((value >> 12) & 0xF) as u8,
+            palette_idx: ((value >> 10) & 0x7) as u8,
+            h_flip: (value & (1 << 13)) != 0,
+            v_flip: (value & (1 << 14)) != 0,
+            priority: (value & (1 << 15)) != 0,
         }
     }
 
@@ -81,7 +93,7 @@ impl TilemapEntry {
         self.tile_index
     }
 
-    /// Returns the palette index (0-15)
+    /// Returns the palette index (0-7)
     pub fn palette_idx(&self) -> u8 {
         self.palette_idx
     }
@@ -96,14 +108,19 @@ impl TilemapEntry {
         self.v_flip
     }
 
+    /// Returns the priority flag
+    pub fn priority(&self) -> bool {
+        self.priority
+    }
+
     /// Sets the tile index (will be clamped to 0-1023)
     pub fn set_tile_index(&mut self, tile_index: u16) {
         self.tile_index = tile_index.min(1023);
     }
 
-    /// Sets the palette index (will be clamped to 0-15)
+    /// Sets the palette index (will be clamped to 0-7)
     pub fn set_palette_idx(&mut self, palette_idx: u8) {
-        self.palette_idx = palette_idx.min(15);
+        self.palette_idx = palette_idx.min(7);
     }
 
     /// Sets the horizontal flip flag
@@ -115,6 +132,11 @@ impl TilemapEntry {
     pub fn set_v_flip(&mut self, v_flip: bool) {
         self.v_flip = v_flip;
     }
+
+    /// Sets the priority flag
+    pub fn set_priority(&mut self, priority: bool) {
+        self.priority = priority;
+    }
 }
 
 impl Default for TilemapEntry {
@@ -123,6 +145,7 @@ impl Default for TilemapEntry {
             tile_index: 0,
             h_flip: false,
             v_flip: false,
+            priority: false,
             palette_idx: 0,
         }
     }
@@ -289,28 +312,29 @@ mod tests {
 
     #[test]
     fn test_tilemap_entry_new() {
-        let entry = TilemapEntry::new(100, 5, true, false);
+        let entry = TilemapEntry::new(100, 5, true, false, false);
         assert_eq!(entry.tile_index(), 100);
         assert_eq!(entry.palette_idx(), 5);
         assert_eq!(entry.h_flip(), true);
         assert_eq!(entry.v_flip(), false);
+        assert_eq!(entry.priority(), false);
     }
 
     #[test]
     fn test_tilemap_entry_new_clamps() {
-        let entry = TilemapEntry::new(2000, 20, false, false);
+        let entry = TilemapEntry::new(2000, 20, false, false, false);
         assert_eq!(entry.tile_index(), 1023); // Clamped to max
-        assert_eq!(entry.palette_idx(), 15); // Clamped to max
+        assert_eq!(entry.palette_idx(), 7); // Clamped to max (backgrounds use 0-7)
     }
 
     #[test]
     fn test_tilemap_entry_u16_conversion() {
-        let entry = TilemapEntry::new(512, 7, true, true);
+        let entry = TilemapEntry::new(512, 7, true, true, true);
         let value = entry.to_u16();
 
-        // 512 | (1 << 10) | (1 << 11) | (7 << 12)
-        // = 0b0111_1100_0000_0000 = 0x7C00
-        let expected = 512 | (1 << 10) | (1 << 11) | (7 << 12);
+        // 512 | (7 << 10) | (1 << 13) | (1 << 14) | (1 << 15)
+        // Per Cicada-16 spec: bits 0-9=tile, 10-12=palette, 13=hflip, 14=vflip, 15=priority
+        let expected = 512 | (7 << 10) | (1 << 13) | (1 << 14) | (1 << 15);
         assert_eq!(value, expected);
 
         let entry2 = TilemapEntry::from_u16(value);
@@ -319,11 +343,11 @@ mod tests {
 
     #[test]
     fn test_tilemap_entry_u16_no_flips() {
-        let entry = TilemapEntry::new(123, 3, false, false);
+        let entry = TilemapEntry::new(123, 3, false, false, false);
         let value = entry.to_u16();
 
-        // 123 | (3 << 12) = 0b0011_0000_0111_1011
-        let expected = 123 | (3 << 12);
+        // 123 | (3 << 10) per Cicada-16 spec
+        let expected = 123 | (3 << 10);
         assert_eq!(value, expected);
 
         let entry2 = TilemapEntry::from_u16(value);
@@ -337,6 +361,7 @@ mod tests {
         assert_eq!(entry.palette_idx(), 0);
         assert_eq!(entry.h_flip(), false);
         assert_eq!(entry.v_flip(), false);
+        assert_eq!(entry.priority(), false);
     }
 
     #[test]
@@ -344,14 +369,16 @@ mod tests {
         let mut entry = TilemapEntry::default();
 
         entry.set_tile_index(456);
-        entry.set_palette_idx(8);
+        entry.set_palette_idx(6);
         entry.set_h_flip(true);
         entry.set_v_flip(true);
+        entry.set_priority(true);
 
         assert_eq!(entry.tile_index(), 456);
-        assert_eq!(entry.palette_idx(), 8);
+        assert_eq!(entry.palette_idx(), 6);
         assert_eq!(entry.h_flip(), true);
         assert_eq!(entry.v_flip(), true);
+        assert_eq!(entry.priority(), true);
     }
 
     #[test]
@@ -378,7 +405,7 @@ mod tests {
     #[test]
     fn test_tilemap_set_and_get() {
         let mut tilemap = Tilemap::new(10, 10);
-        let entry = TilemapEntry::new(42, 3, true, false);
+        let entry = TilemapEntry::new(42, 3, true, false, false);
 
         tilemap.set_entry(5, 7, entry);
         assert_eq!(tilemap.get_entry(5, 7), Some(entry));
@@ -388,7 +415,7 @@ mod tests {
     #[test]
     fn test_tilemap_out_of_bounds() {
         let mut tilemap = Tilemap::new(10, 10);
-        let entry = TilemapEntry::new(100, 5, false, false);
+        let entry = TilemapEntry::new(100, 5, false, false, false);
 
         // Out of bounds set should do nothing
         tilemap.set_entry(10, 0, entry);
@@ -405,19 +432,20 @@ mod tests {
     fn test_tilemap_binary_export() {
         let mut tilemap = Tilemap::new(4, 4);
 
-        tilemap.set_entry(0, 0, TilemapEntry::new(1, 0, false, false));
-        tilemap.set_entry(1, 0, TilemapEntry::new(2, 1, true, false));
-        tilemap.set_entry(0, 1, TilemapEntry::new(3, 2, false, true));
+        tilemap.set_entry(0, 0, TilemapEntry::new(1, 0, false, false, false));
+        tilemap.set_entry(1, 0, TilemapEntry::new(2, 1, true, false, false));
+        tilemap.set_entry(0, 1, TilemapEntry::new(3, 2, false, true, false));
 
         let binary = tilemap.export_binary();
         assert_eq!(binary.len(), 4 * 4 * 2); // 32 bytes
 
-        // Check first entry (tile 1, palette 0, no flips) = 0x0001
+        // Check first entry (tile 1, palette 0, no flips, no priority) = 0x0001
         assert_eq!(binary[0], 0x01);
         assert_eq!(binary[1], 0x00);
 
-        // Check second entry (tile 2, palette 1, h_flip) = 0x1402
-        let expected = 2 | (1 << 10) | (1 << 12);
+        // Check second entry (tile 2, palette 1, h_flip)
+        // Per Cicada-16 spec: bits 0-9=tile(2), 10-12=pal(1), 13=hflip(1), 14=vflip(0), 15=priority(0)
+        let expected = 2 | (1 << 10) | (1 << 13);
         assert_eq!(binary[2], (expected & 0xFF) as u8);
         assert_eq!(binary[3], ((expected >> 8) & 0xFF) as u8);
     }
@@ -430,7 +458,7 @@ mod tests {
         for y in 0..8 {
             for x in 0..8 {
                 let entry =
-                    TilemapEntry::new((y * 8 + x) as u16, (x % 16) as u8, x % 2 == 0, y % 2 == 0);
+                    TilemapEntry::new((y * 8 + x) as u16, (x % 8) as u8, x % 2 == 0, y % 2 == 0, (x + y) % 2 == 0);
                 tilemap1.set_entry(x, y, entry);
             }
         }
@@ -450,7 +478,7 @@ mod tests {
     #[test]
     fn test_tilemap_resize_grow() {
         let mut tilemap = Tilemap::new(4, 4);
-        let entry = TilemapEntry::new(123, 5, true, true);
+        let entry = TilemapEntry::new(123, 5, true, true, false);
         tilemap.set_entry(2, 2, entry);
 
         tilemap.resize(8, 8);
@@ -467,8 +495,8 @@ mod tests {
     #[test]
     fn test_tilemap_resize_shrink() {
         let mut tilemap = Tilemap::new(10, 10);
-        let entry1 = TilemapEntry::new(111, 3, false, false);
-        let entry2 = TilemapEntry::new(222, 7, true, true);
+        let entry1 = TilemapEntry::new(111, 3, false, false, false);
+        let entry2 = TilemapEntry::new(222, 7, true, true, true);
 
         tilemap.set_entry(2, 2, entry1);
         tilemap.set_entry(8, 8, entry2);
@@ -487,7 +515,7 @@ mod tests {
     #[test]
     fn test_tilemap_clear() {
         let mut tilemap = Tilemap::new(4, 4);
-        let entry = TilemapEntry::new(100, 5, true, true);
+        let entry = TilemapEntry::new(100, 5, true, true, false);
 
         tilemap.fill(entry);
         assert_eq!(tilemap.get_entry(0, 0), Some(entry));
@@ -501,7 +529,7 @@ mod tests {
     #[test]
     fn test_tilemap_fill() {
         let mut tilemap = Tilemap::new(5, 5);
-        let entry = TilemapEntry::new(42, 7, false, true);
+        let entry = TilemapEntry::new(42, 7, false, true, true);
 
         tilemap.fill(entry);
 
@@ -515,18 +543,20 @@ mod tests {
     #[test]
     fn test_tilemap_entry_all_combinations() {
         // Test all flip combinations with various tile and palette values
-        for h_flip in [false, true] {
-            for v_flip in [false, true] {
-                for tile_idx in [0, 511, 1023] {
-                    for pal_idx in [0, 7, 15] {
-                        let entry = TilemapEntry::new(tile_idx, pal_idx, h_flip, v_flip);
-                        let value = entry.to_u16();
-                        let entry2 = TilemapEntry::from_u16(value);
-                        assert_eq!(
-                            entry, entry2,
-                            "Round-trip failed for tile={}, pal={}, h_flip={}, v_flip={}",
-                            tile_idx, pal_idx, h_flip, v_flip
-                        );
+        for priority in [false, true] {
+            for h_flip in [false, true] {
+                for v_flip in [false, true] {
+                    for tile_idx in [0, 511, 1023] {
+                        for pal_idx in [0, 3, 7] {
+                            let entry = TilemapEntry::new(tile_idx, pal_idx, h_flip, v_flip, priority);
+                            let value = entry.to_u16();
+                            let entry2 = TilemapEntry::from_u16(value);
+                            assert_eq!(
+                                entry, entry2,
+                                "Round-trip failed for tile={}, pal={}, h_flip={}, v_flip={}, priority={}",
+                                tile_idx, pal_idx, h_flip, v_flip, priority
+                            );
+                        }
                     }
                 }
             }

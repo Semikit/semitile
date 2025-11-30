@@ -569,16 +569,18 @@ export class WasmTilemapEntry {
      *
      * # Arguments
      * * `tile_index` - Tile index (0-1023), will be clamped to 1023
-     * * `palette_idx` - Palette index (0-15), will be clamped to 15
+     * * `palette_idx` - Palette index (0-7), will be clamped to 7 (backgrounds use palettes 0-7)
      * * `h_flip` - Horizontal flip flag
      * * `v_flip` - Vertical flip flag
+     * * `priority` - Priority flag (vs. sprites)
      * @param {number} tile_index
      * @param {number} palette_idx
      * @param {boolean} h_flip
      * @param {boolean} v_flip
+     * @param {boolean} priority
      */
-    constructor(tile_index, palette_idx, h_flip, v_flip) {
-        const ret = wasm.wasmtilemapentry_new(tile_index, palette_idx, h_flip, v_flip);
+    constructor(tile_index, palette_idx, h_flip, v_flip, priority) {
+        const ret = wasm.wasmtilemapentry_new(tile_index, palette_idx, h_flip, v_flip, priority);
         this.__wbg_ptr = ret >>> 0;
         WasmTilemapEntryFinalization.register(this, this.__wbg_ptr, this);
         return this;
@@ -609,7 +611,7 @@ export class WasmTilemapEntry {
         return ret;
     }
     /**
-     * Returns the palette index (0-15)
+     * Returns the palette index (0-7)
      * @returns {number}
      */
     paletteIdx() {
@@ -633,6 +635,14 @@ export class WasmTilemapEntry {
         return ret !== 0;
     }
     /**
+     * Returns the priority flag
+     * @returns {boolean}
+     */
+    priority() {
+        const ret = wasm.wasmtilemapentry_priority(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
      * Sets the tile index (will be clamped to 0-1023)
      * @param {number} tile_index
      */
@@ -640,7 +650,7 @@ export class WasmTilemapEntry {
         wasm.wasmtilemapentry_setTileIndex(this.__wbg_ptr, tile_index);
     }
     /**
-     * Sets the palette index (will be clamped to 0-15)
+     * Sets the palette index (will be clamped to 0-7)
      * @param {number} palette_idx
      */
     setPaletteIdx(palette_idx) {
@@ -659,6 +669,13 @@ export class WasmTilemapEntry {
      */
     setVFlip(v_flip) {
         wasm.wasmtilemapentry_setVFlip(this.__wbg_ptr, v_flip);
+    }
+    /**
+     * Sets the priority flag
+     * @param {boolean} priority
+     */
+    setPriority(priority) {
+        wasm.wasmtilemapentry_setPriority(this.__wbg_ptr, priority);
     }
 }
 if (Symbol.dispose) WasmTilemapEntry.prototype[Symbol.dispose] = WasmTilemapEntry.prototype.free;

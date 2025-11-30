@@ -28,10 +28,10 @@ import { WasmTilemap, WasmTilemapEntry } from "../lib/wasm-loader.js";
  * automatically update when the state changes.
  *
  * Events emitted:
- * - entryChanged: { x, y, tileIndex, paletteIdx, hFlip, vFlip }
+ * - entryChanged: { x, y, tileIndex, paletteIdx, hFlip, vFlip, priority }
  * - tilemapResized: { width, height }
  * - tilemapCleared: {}
- * - tilemapFilled: { tileIndex, paletteIdx, hFlip, vFlip }
+ * - tilemapFilled: { tileIndex, paletteIdx, hFlip, vFlip, priority }
  * - tilemapImported: {}
  *
  * Usage:
@@ -77,6 +77,7 @@ export class TilemapModel extends EventEmitter {
     paletteIdx: number;
     hFlip: boolean;
     vFlip: boolean;
+    priority: boolean;
   } | null {
     const entry = this.tilemap.getEntry(x, y);
     if (!entry) return null;
@@ -86,6 +87,7 @@ export class TilemapModel extends EventEmitter {
       paletteIdx: entry.paletteIdx(),
       hFlip: entry.hFlip(),
       vFlip: entry.vFlip(),
+      priority: entry.priority(),
     };
   }
 
@@ -100,11 +102,12 @@ export class TilemapModel extends EventEmitter {
     tileIndex: number,
     paletteIdx: number,
     hFlip: boolean,
-    vFlip: boolean
+    vFlip: boolean,
+    priority: boolean = false
   ): void {
-    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
+    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip, priority);
     this.tilemap.setEntry(x, y, entry);
-    this.emit("entryChanged", { x, y, tileIndex, paletteIdx, hFlip, vFlip });
+    this.emit("entryChanged", { x, y, tileIndex, paletteIdx, hFlip, vFlip, priority });
   }
 
   /**
@@ -121,6 +124,7 @@ export class TilemapModel extends EventEmitter {
       paletteIdx: entry.paletteIdx(),
       hFlip: entry.hFlip(),
       vFlip: entry.vFlip(),
+      priority: entry.priority(),
     });
   }
 
@@ -149,10 +153,10 @@ export class TilemapModel extends EventEmitter {
    *
    * Emits 'tilemapFilled' event
    */
-  fill(tileIndex: number, paletteIdx: number, hFlip: boolean, vFlip: boolean): void {
-    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip);
+  fill(tileIndex: number, paletteIdx: number, hFlip: boolean, vFlip: boolean, priority: boolean = false): void {
+    const entry = new WasmTilemapEntry(tileIndex, paletteIdx, hFlip, vFlip, priority);
     this.tilemap.fill(entry);
-    this.emit("tilemapFilled", { tileIndex, paletteIdx, hFlip, vFlip });
+    this.emit("tilemapFilled", { tileIndex, paletteIdx, hFlip, vFlip, priority });
   }
 
   /**

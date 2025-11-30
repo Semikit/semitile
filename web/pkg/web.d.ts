@@ -191,11 +191,12 @@ export class WasmTilemapEntry {
    *
    * # Arguments
    * * `tile_index` - Tile index (0-1023), will be clamped to 1023
-   * * `palette_idx` - Palette index (0-15), will be clamped to 15
+   * * `palette_idx` - Palette index (0-7), will be clamped to 7 (backgrounds use palettes 0-7)
    * * `h_flip` - Horizontal flip flag
    * * `v_flip` - Vertical flip flag
+   * * `priority` - Priority flag (vs. sprites)
    */
-  constructor(tile_index: number, palette_idx: number, h_flip: boolean, v_flip: boolean);
+  constructor(tile_index: number, palette_idx: number, h_flip: boolean, v_flip: boolean, priority: boolean);
   /**
    * Converts the tilemap entry to 16-bit format (little-endian)
    */
@@ -209,7 +210,7 @@ export class WasmTilemapEntry {
    */
   tileIndex(): number;
   /**
-   * Returns the palette index (0-15)
+   * Returns the palette index (0-7)
    */
   paletteIdx(): number;
   /**
@@ -221,11 +222,15 @@ export class WasmTilemapEntry {
    */
   vFlip(): boolean;
   /**
+   * Returns the priority flag
+   */
+  priority(): boolean;
+  /**
    * Sets the tile index (will be clamped to 0-1023)
    */
   setTileIndex(tile_index: number): void;
   /**
-   * Sets the palette index (will be clamped to 0-15)
+   * Sets the palette index (will be clamped to 0-7)
    */
   setPaletteIdx(palette_idx: number): void;
   /**
@@ -236,6 +241,10 @@ export class WasmTilemapEntry {
    * Sets the vertical flip flag
    */
   setVFlip(v_flip: boolean): void;
+  /**
+   * Sets the priority flag
+   */
+  setPriority(priority: boolean): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -262,17 +271,19 @@ export interface InitOutput {
   readonly wasmpalette_exportBinary: (a: number) => [number, number];
   readonly wasmpalette_importBinary: (a: number, b: number) => number;
   readonly __wbg_wasmtilemapentry_free: (a: number, b: number) => void;
-  readonly wasmtilemapentry_new: (a: number, b: number, c: number, d: number) => number;
+  readonly wasmtilemapentry_new: (a: number, b: number, c: number, d: number, e: number) => number;
   readonly wasmtilemapentry_toU16: (a: number) => number;
   readonly wasmtilemapentry_fromU16: (a: number) => number;
   readonly wasmtilemapentry_tileIndex: (a: number) => number;
   readonly wasmtilemapentry_paletteIdx: (a: number) => number;
   readonly wasmtilemapentry_hFlip: (a: number) => number;
   readonly wasmtilemapentry_vFlip: (a: number) => number;
+  readonly wasmtilemapentry_priority: (a: number) => number;
   readonly wasmtilemapentry_setTileIndex: (a: number, b: number) => void;
   readonly wasmtilemapentry_setPaletteIdx: (a: number, b: number) => void;
   readonly wasmtilemapentry_setHFlip: (a: number, b: number) => void;
   readonly wasmtilemapentry_setVFlip: (a: number, b: number) => void;
+  readonly wasmtilemapentry_setPriority: (a: number, b: number) => void;
   readonly __wbg_wasmtilemap_free: (a: number, b: number) => void;
   readonly wasmtilemap_new: (a: number, b: number) => number;
   readonly wasmtilemap_width: (a: number) => number;
