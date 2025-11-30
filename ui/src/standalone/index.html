@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Semitile - Cicada-16 Tile Editor</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="loading-screen" class="loading-screen">
+      <div class="loading-content">
+        <h1 class="loading-title">🎨 Semitile</h1>
+        <p class="loading-subtitle">Cicada-16 Tile Editor</p>
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Loading WASM module...</p>
+      </div>
+    </div>
+
+    <div id="app-container" class="app-container" style="display: none">
+      <header class="app-header">
+        <div class="header-content">
+          <h1 class="app-title">🎨 Semitile</h1>
+          <p class="app-subtitle">Cicada-16 Tile Editor</p>
+        </div>
+        <nav class="app-nav">
+          <button id="btn-clear" class="nav-button">Clear Tile</button>
+          <button id="btn-undo" class="nav-button secondary" disabled>
+            Undo
+          </button>
+          <button id="btn-redo" class="nav-button secondary" disabled>
+            Redo
+          </button>
+        </nav>
+      </header>
+
+      <main class="editor-layout">
+        <!-- Left Panel: Tools -->
+        <aside class="tools-panel">
+          <tool-panel id="tool-panel"></tool-panel>
+        </aside>
+
+        <!-- Center Panel: Canvas -->
+        <section class="canvas-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Tile Canvas</h2>
+            <p class="panel-subtitle">8×8 pixels</p>
+          </div>
+          <div class="canvas-container">
+            <tile-canvas id="tile-canvas"></tile-canvas>
+          </div>
+        </section>
+
+        <!-- Right Panel: Palette -->
+        <aside class="palette-panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Palette</h2>
+          </div>
+          <palette-editor id="palette-editor"></palette-editor>
+
+          <div class="panel-divider"></div>
+
+          <div class="panel-header">
+            <h2 class="panel-title">Color Picker</h2>
+          </div>
+          <color-picker id="color-picker"></color-picker>
+        </aside>
+      </main>
+
+      <footer class="app-footer">
+        <p class="footer-text">
+          Semitile - A web-based tile editor for the Cicada-16 fantasy console
+        </p>
+        <p class="footer-text">
+          Built with MVC architecture • WASM + TypeScript + Web Components
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="./app.ts"></script>
+  </body>
+</html>

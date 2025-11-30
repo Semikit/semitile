@@ -1,0 +1,303 @@
+/*
+ * Copyright (C) 2025 Connor Nolan connor@cnolandev.com
+ *
+ * This file is part of the Semikit project.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Root Variables */
+:root {
+  /* Cicada-16 brand colors */
+  --c16-primary: #00ff88;
+  --c16-primary-dark: #00cc6a;
+  --c16-secondary: #ff0088;
+  --c16-accent: #00d4ff;
+
+  /* Background colors */
+  --c16-bg-dark: #1a1a2e;
+  --c16-bg-medium: #16213e;
+  --c16-bg-light: #0f3460;
+  --c16-bg-darkest: #0a0a0f;
+
+  /* Text colors */
+  --c16-text-primary: #ffffff;
+  --c16-text-secondary: #b8b8b8;
+  --c16-text-muted: #666666;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border radius */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  /* Typography */
+  --font-mono: "SF Mono", "Courier New", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Global Styles */
+body {
+  font-family: var(--font-sans);
+  background: var(--c16-bg-dark);
+  color: var(--c16-text-primary);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* Loading Screen */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--c16-bg-dark);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-title {
+  font-size: 3rem;
+  color: var(--c16-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.loading-subtitle {
+  font-size: 1.2rem;
+  color: var(--c16-accent);
+  margin-bottom: var(--spacing-xl);
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid var(--c16-bg-light);
+  border-top-color: var(--c16-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto var(--spacing-lg);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: var(--c16-text-secondary);
+  font-size: 0.9rem;
+}
+
+/* App Container */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.app-header {
+  background: var(--c16-bg-medium);
+  border-bottom: 2px solid var(--c16-bg-light);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-content {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.app-title {
+  font-size: 1.8rem;
+  color: var(--c16-primary);
+  font-weight: 700;
+}
+
+.app-subtitle {
+  font-size: 1rem;
+  color: var(--c16-accent);
+}
+
+.app-nav {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.nav-button {
+  background: var(--c16-primary);
+  color: var(--c16-bg-dark);
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: var(--font-sans);
+}
+
+.nav-button:hover:not(:disabled) {
+  background: var(--c16-primary-dark);
+}
+
+.nav-button:disabled {
+  background: var(--c16-bg-light);
+  color: var(--c16-text-muted);
+  cursor: not-allowed;
+}
+
+.nav-button.secondary {
+  background: var(--c16-bg-medium);
+  color: var(--c16-accent);
+  border: 2px solid var(--c16-accent);
+}
+
+.nav-button.secondary:hover:not(:disabled) {
+  background: var(--c16-bg-light);
+}
+
+/* Editor Layout */
+.editor-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 250px 1fr 320px;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Panels */
+.tools-panel,
+.canvas-panel,
+.palette-panel {
+  background: var(--c16-bg-medium);
+  border: 1px solid var(--c16-bg-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+}
+
+.panel-header {
+  margin-bottom: var(--spacing-md);
+}
+
+.panel-title {
+  color: var(--c16-accent);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.panel-subtitle {
+  color: var(--c16-text-secondary);
+  font-size: 0.85rem;
+}
+
+.panel-divider {
+  height: 1px;
+  background: var(--c16-bg-light);
+  margin: var(--spacing-lg) 0;
+}
+
+/* Canvas Panel */
+.canvas-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: var(--spacing-lg);
+}
+
+/* Footer */
+.app-footer {
+  background: var(--c16-bg-medium);
+  border-top: 2px solid var(--c16-bg-light);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  text-align: center;
+}
+
+.footer-text {
+  color: var(--c16-text-secondary);
+  font-size: 0.85rem;
+  margin: var(--spacing-xs) 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .editor-layout {
+    grid-template-columns: 200px 1fr 280px;
+  }
+}
+
+@media (max-width: 992px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .app-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: flex-start;
+  }
+
+  .app-nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: var(--spacing-md);
+  }
+
+  .editor-layout {
+    padding: var(--spacing-md);
+  }
+
+  .app-title {
+    font-size: 1.5rem;
+  }
+
+  .loading-title {
+    font-size: 2rem;
+  }
+}
