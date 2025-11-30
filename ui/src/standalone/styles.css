@@ -192,6 +192,17 @@ body {
   background: var(--c16-bg-light);
 }
 
+.nav-group {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.nav-divider {
+  width: 1px;
+  background: var(--c16-bg-light);
+  margin: 0 var(--spacing-sm);
+}
+
 /* Editor Layout */
 .editor-layout {
   flex: 1;
@@ -300,4 +311,213 @@ body {
   .loading-title {
     font-size: 2rem;
   }
+}
+
+/* Dialog Styles */
+.dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.dialog-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.dialog-content {
+  position: relative;
+  background: var(--c16-bg-medium);
+  border: 2px solid var(--c16-bg-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-title {
+  color: var(--c16-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--spacing-xs);
+}
+
+.dialog-subtitle {
+  color: var(--c16-text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: var(--spacing-lg);
+}
+
+.dialog-section {
+  margin: var(--spacing-lg) 0;
+}
+
+.section-title {
+  color: var(--c16-accent);
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+.dialog-button {
+  width: 100%;
+  background: var(--c16-bg-light);
+  color: var(--c16-text-primary);
+  border: 1px solid var(--c16-bg-darkest);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin: var(--spacing-xs) 0;
+  text-align: left;
+  font-size: 0.9rem;
+  font-family: var(--font-sans);
+}
+
+.dialog-button:hover {
+  background: var(--c16-bg-darkest);
+  border-color: var(--c16-accent);
+}
+
+.dialog-button-primary {
+  background: var(--c16-primary);
+  color: var(--c16-bg-dark);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: var(--font-sans);
+}
+
+.dialog-button-primary:hover {
+  background: var(--c16-primary-dark);
+}
+
+.dialog-button-secondary {
+  background: var(--c16-bg-medium);
+  color: var(--c16-text-secondary);
+  border: 2px solid var(--c16-bg-light);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font-sans);
+}
+
+.dialog-button-secondary:hover {
+  border-color: var(--c16-accent);
+  color: var(--c16-accent);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  justify-content: flex-end;
+}
+
+.input-label {
+  display: block;
+  color: var(--c16-accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+.text-input {
+  width: 100%;
+  background: var(--c16-bg-darkest);
+  color: var(--c16-text-primary);
+  border: 2px solid var(--c16-bg-light);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.text-input:focus {
+  border-color: var(--c16-primary);
+}
+
+.text-input::placeholder {
+  color: var(--c16-text-muted);
+}
+
+.project-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.project-item {
+  background: var(--c16-bg-light);
+  border: 1px solid var(--c16-bg-darkest);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin: var(--spacing-xs) 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-item:hover {
+  background: var(--c16-bg-darkest);
+  border-color: var(--c16-accent);
+}
+
+.project-info {
+  flex: 1;
+}
+
+.project-name {
+  color: var(--c16-text-primary);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.project-date {
+  color: var(--c16-text-muted);
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+}
+
+.project-delete {
+  background: var(--c16-secondary);
+  color: var(--c16-text-primary);
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: opacity 0.2s;
+}
+
+.project-delete:hover {
+  opacity: 0.8;
+}
+
+.empty-state {
+  color: var(--c16-text-muted);
+  text-align: center;
+  padding: var(--spacing-xl);
+  font-style: italic;
 }

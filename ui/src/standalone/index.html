@@ -23,15 +23,102 @@
           <p class="app-subtitle">Cicada-16 Tile Editor</p>
         </div>
         <nav class="app-nav">
-          <button id="btn-clear" class="nav-button">Clear Tile</button>
-          <button id="btn-undo" class="nav-button secondary" disabled>
-            Undo
-          </button>
-          <button id="btn-redo" class="nav-button secondary" disabled>
-            Redo
-          </button>
+          <div class="nav-group">
+            <button id="btn-save" class="nav-button">Save Project</button>
+            <button id="btn-load" class="nav-button secondary">Load Project</button>
+            <button id="btn-export" class="nav-button secondary">Export</button>
+          </div>
+          <div class="nav-divider"></div>
+          <div class="nav-group">
+            <button id="btn-clear" class="nav-button secondary">Clear</button>
+            <button id="btn-undo" class="nav-button secondary" disabled>Undo</button>
+            <button id="btn-redo" class="nav-button secondary" disabled>Redo</button>
+          </div>
         </nav>
       </header>
+
+      <!-- Export Dialog -->
+      <div id="export-dialog" class="dialog" style="display: none">
+        <div class="dialog-backdrop"></div>
+        <div class="dialog-content">
+          <h2 class="dialog-title">Export</h2>
+          <p class="dialog-subtitle">Choose export format</p>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Tile Exports</h3>
+            <button id="export-tile-bin" class="dialog-button">Tile Binary (.bin)</button>
+            <button id="export-tile-h" class="dialog-button">Tile C Header (.h)</button>
+            <button id="export-tile-asm" class="dialog-button">Tile Assembly (.asm)</button>
+          </div>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Palette Exports</h3>
+            <button id="export-palette-bin" class="dialog-button">Palette Binary (.bin)</button>
+            <button id="export-palette-h" class="dialog-button">Palette C Header (.h)</button>
+            <button id="export-palette-asm" class="dialog-button">Palette Assembly (.asm)</button>
+          </div>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Project Export</h3>
+            <button id="export-project-json" class="dialog-button">Project JSON (.json)</button>
+          </div>
+
+          <div class="dialog-actions">
+            <button id="export-close" class="dialog-button-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Load Dialog -->
+      <div id="load-dialog" class="dialog" style="display: none">
+        <div class="dialog-backdrop"></div>
+        <div class="dialog-content">
+          <h2 class="dialog-title">Load Project</h2>
+          <p class="dialog-subtitle">Choose a saved project or import from file</p>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Saved Projects</h3>
+            <div id="project-list" class="project-list">
+              <p class="empty-state">No saved projects</p>
+            </div>
+          </div>
+
+          <div class="dialog-section">
+            <h3 class="section-title">Import from File</h3>
+            <input type="file" id="import-project" accept=".json" style="display: none" />
+            <button id="import-project-btn" class="dialog-button">Import Project JSON</button>
+          </div>
+
+          <div class="dialog-actions">
+            <button id="load-close" class="dialog-button-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Save Dialog -->
+      <div id="save-dialog" class="dialog" style="display: none">
+        <div class="dialog-backdrop"></div>
+        <div class="dialog-content">
+          <h2 class="dialog-title">Save Project</h2>
+          <p class="dialog-subtitle">Enter a name for your project</p>
+
+          <div class="dialog-section">
+            <label class="input-label">Project Name</label>
+            <input
+              type="text"
+              id="project-name-input"
+              class="text-input"
+              placeholder="my_tile"
+              value="untitled"
+            />
+          </div>
+
+          <div class="dialog-actions">
+            <button id="save-confirm" class="dialog-button-primary">Save</button>
+            <button id="save-close" class="dialog-button-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
 
       <main class="editor-layout">
         <!-- Left Panel: Tools -->

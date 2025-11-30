@@ -34,6 +34,7 @@ import { ToolPanel } from "../views/ToolPanel/ToolPanel.js";
 // Controllers
 import { TileEditorController } from "../controllers/TileEditorController.js";
 import { PaletteController } from "../controllers/PaletteController.js";
+import { FileController } from "../controllers/FileController.js";
 
 /**
  * Main application entry point
@@ -99,6 +100,9 @@ async function main() {
       colorPicker
     );
 
+    // File Controller - handles save/load/export operations
+    const fileController = new FileController(tileModel, paletteModel);
+
     console.log("[App] Controllers created and wired");
 
     // ===== WIRE UP TOOL PANEL =====
@@ -149,6 +153,279 @@ async function main() {
     }
 
     console.log("[App] Navigation buttons wired");
+
+    // ===== WIRE UP FILE OPERATIONS =====
+
+    // Get dialog elements
+    const saveDialog = document.getElementById("save-dialog");
+    const loadDialog = document.getElementById("load-dialog");
+    const exportDialog = document.getElementById("export-dialog");
+
+    // Helper functions for dialogs
+    const showDialog = (dialog: HTMLElement | null) => {
+      if (dialog) dialog.style.display = "flex";
+    };
+
+    const hideDialog = (dialog: HTMLElement | null) => {
+      if (dialog) dialog.style.display = "none";
+    };
+
+    // Save button - open save dialog
+    const btnSave = document.getElementById("btn-save");
+    if (btnSave) {
+      btnSave.addEventListener("click", () => {
+        const input = document.getElementById("project-name-input") as HTMLInputElement;
+        if (input) {
+          input.value = fileController.getCurrentProjectName();
+        }
+        showDialog(saveDialog);
+      });
+    }
+
+    // Save dialog - confirm button
+    const btnSaveConfirm = document.getElementById("save-confirm");
+    if (btnSaveConfirm) {
+      btnSaveConfirm.addEventListener("click", async () => {
+        const input = document.getElementById("project-name-input") as HTMLInputElement;
+        if (input && input.value.trim()) {
+          try {
+            await fileController.saveProject(input.value.trim());
+            console.log(`[App] Project saved: ${input.value.trim()}`);
+            hideDialog(saveDialog);
+          } catch (error) {
+            console.error("[App] Failed to save project:", error);
+            alert("Failed to save project. Check console for details.");
+          }
+        }
+      });
+    }
+
+    // Save dialog - close button
+    const btnSaveClose = document.getElementById("save-close");
+    if (btnSaveClose) {
+      btnSaveClose.addEventListener("click", () => {
+        hideDialog(saveDialog);
+      });
+    }
+
+    // Load button - open load dialog and populate project list
+    const btnLoad = document.getElementById("btn-load");
+    if (btnLoad) {
+      btnLoad.addEventListener("click", async () => {
+        await populateProjectList();
+        showDialog(loadDialog);
+      });
+    }
+
+    // Function to populate project list
+    async function populateProjectList() {
+      const projectList = document.getElementById("project-list");
+      if (!projectList) return;
+
+      try {
+        const projects = await fileController.listProjects();
+
+        if (projects.length === 0) {
+          projectList.innerHTML = '<p class="empty-state">No saved projects</p>';
+          return;
+        }
+
+        projectList.innerHTML = "";
+
+        projects.forEach((project) => {
+          const item = document.createElement("div");
+          item.className = "project-item";
+
+          const info = document.createElement("div");
+          info.className = "project-info";
+
+          const name = document.createElement("div");
+          name.className = "project-name";
+          name.textContent = project.name;
+
+          const date = document.createElement("div");
+          date.className = "project-date";
+          date.textContent = new Date(project.updatedAt).toLocaleString();
+
+          info.appendChild(name);
+          info.appendChild(date);
+
+          const deleteBtn = document.createElement("button");
+          deleteBtn.className = "project-delete";
+          deleteBtn.textContent = "Delete";
+          deleteBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (confirm(`Delete project "${project.name}"?`)) {
+              await fileController.deleteProject(project.name);
+              await populateProjectList();
+            }
+          });
+
+          item.appendChild(info);
+          item.appendChild(deleteBtn);
+
+          item.addEventListener("click", async () => {
+            try {
+              const success = await fileController.loadProject(project.name);
+              if (success) {
+                console.log(`[App] Project loaded: ${project.name}`);
+                hideDialog(loadDialog);
+              } else {
+                alert("Failed to load project. Check console for details.");
+              }
+            } catch (error) {
+              console.error("[App] Failed to load project:", error);
+              alert("Failed to load project. Check console for details.");
+            }
+          });
+
+          projectList.appendChild(item);
+        });
+      } catch (error) {
+        console.error("[App] Failed to list projects:", error);
+        projectList.innerHTML = '<p class="empty-state">Error loading projects</p>';
+      }
+    }
+
+    // Import project button
+    const btnImportProject = document.getElementById("import-project-btn");
+    const inputImportProject = document.getElementById("import-project") as HTMLInputElement;
+
+    if (btnImportProject && inputImportProject) {
+      btnImportProject.addEventListener("click", () => {
+        inputImportProject.click();
+      });
+
+      inputImportProject.addEventListener("change", async () => {
+        if (inputImportProject.files && inputImportProject.files.length > 0) {
+          const file = inputImportProject.files[0];
+          try {
+            const success = await fileController.importProjectJSON(file);
+            if (success) {
+              console.log("[App] Project imported successfully");
+              hideDialog(loadDialog);
+            } else {
+              alert("Failed to import project. Check console for details.");
+            }
+          } catch (error) {
+            console.error("[App] Failed to import project:", error);
+            alert("Failed to import project. Check console for details.");
+          }
+          inputImportProject.value = "";
+        }
+      });
+    }
+
+    // Load dialog - close button
+    const btnLoadClose = document.getElementById("load-close");
+    if (btnLoadClose) {
+      btnLoadClose.addEventListener("click", () => {
+        hideDialog(loadDialog);
+      });
+    }
+
+    // Export button - open export dialog
+    const btnExport = document.getElementById("btn-export");
+    if (btnExport) {
+      btnExport.addEventListener("click", () => {
+        showDialog(exportDialog);
+      });
+    }
+
+    // Export tile binary
+    const btnExportTileBin = document.getElementById("export-tile-bin");
+    if (btnExportTileBin) {
+      btnExportTileBin.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTileBinary(`${name}.bin`);
+      });
+    }
+
+    // Export tile C header
+    const btnExportTileH = document.getElementById("export-tile-h");
+    if (btnExportTileH) {
+      btnExportTileH.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTileCHeader(`${name}.h`);
+      });
+    }
+
+    // Export tile ASM
+    const btnExportTileAsm = document.getElementById("export-tile-asm");
+    if (btnExportTileAsm) {
+      btnExportTileAsm.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportTileASM(`${name}.asm`);
+      });
+    }
+
+    // Export palette binary
+    const btnExportPaletteBin = document.getElementById("export-palette-bin");
+    if (btnExportPaletteBin) {
+      btnExportPaletteBin.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportPaletteBinary(`${name}_palette.bin`);
+      });
+    }
+
+    // Export palette C header
+    const btnExportPaletteH = document.getElementById("export-palette-h");
+    if (btnExportPaletteH) {
+      btnExportPaletteH.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportPaletteCHeader(`${name}_palette.h`);
+      });
+    }
+
+    // Export palette ASM
+    const btnExportPaletteAsm = document.getElementById("export-palette-asm");
+    if (btnExportPaletteAsm) {
+      btnExportPaletteAsm.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportPaletteASM(`${name}_palette.asm`);
+      });
+    }
+
+    // Export project JSON
+    const btnExportProjectJson = document.getElementById("export-project-json");
+    if (btnExportProjectJson) {
+      btnExportProjectJson.addEventListener("click", async () => {
+        const name = fileController.getCurrentProjectName();
+        await fileController.exportProjectJSON(`${name}.json`);
+      });
+    }
+
+    // Export dialog - close button
+    const btnExportClose = document.getElementById("export-close");
+    if (btnExportClose) {
+      btnExportClose.addEventListener("click", () => {
+        hideDialog(exportDialog);
+      });
+    }
+
+    // Close dialogs when clicking backdrop
+    if (saveDialog) {
+      const backdrop = saveDialog.querySelector(".dialog-backdrop");
+      if (backdrop) {
+        backdrop.addEventListener("click", () => hideDialog(saveDialog));
+      }
+    }
+
+    if (loadDialog) {
+      const backdrop = loadDialog.querySelector(".dialog-backdrop");
+      if (backdrop) {
+        backdrop.addEventListener("click", () => hideDialog(loadDialog));
+      }
+    }
+
+    if (exportDialog) {
+      const backdrop = exportDialog.querySelector(".dialog-backdrop");
+      if (backdrop) {
+        backdrop.addEventListener("click", () => hideDialog(exportDialog));
+      }
+    }
+
+    console.log("[App] File operations wired");
 
     // ===== HIDE LOADING, SHOW APP =====
 
