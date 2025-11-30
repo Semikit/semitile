@@ -416,6 +416,33 @@ async function main() {
       });
     }
 
+    // Export all tiles binary
+    const btnExportAllTilesBin = document.getElementById("export-all-tiles-bin");
+    if (btnExportAllTilesBin) {
+      btnExportAllTilesBin.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportAllTilesBinary(`${name}_tiles.bin`);
+      });
+    }
+
+    // Export all tiles C header
+    const btnExportAllTilesH = document.getElementById("export-all-tiles-h");
+    if (btnExportAllTilesH) {
+      btnExportAllTilesH.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportAllTilesCHeader(`${name}_tiles.h`);
+      });
+    }
+
+    // Export all tiles ASM
+    const btnExportAllTilesAsm = document.getElementById("export-all-tiles-asm");
+    if (btnExportAllTilesAsm) {
+      btnExportAllTilesAsm.addEventListener("click", () => {
+        const name = fileController.getCurrentProjectName();
+        fileController.exportAllTilesASM(`${name}_tiles.asm`);
+      });
+    }
+
     // Export palette binary
     const btnExportPaletteBin = document.getElementById("export-palette-bin");
     if (btnExportPaletteBin) {
