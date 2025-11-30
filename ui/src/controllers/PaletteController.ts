@@ -19,17 +19,19 @@
 
 import { PaletteModel } from "../models/PaletteModel.js";
 import type { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
+import type { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
 
 /**
- * PaletteController - Business logic for palette color selection
+ * PaletteController - Business logic for palette color selection and editing
  *
- * This Controller coordinates between the PaletteEditor View and the PaletteModel.
- * It handles user interactions from the View and updates the Model accordingly.
+ * This Controller coordinates between the PaletteEditor, ColorPicker Views and the PaletteModel.
+ * It handles user interactions from the Views and updates the Model accordingly.
  *
  * Responsibilities:
- * - Wire up View to Model
- * - Handle color selection events from View
- * - Handle sub-palette change events from View
+ * - Wire up Views to Model
+ * - Handle color selection events from PaletteEditor
+ * - Handle sub-palette change events from PaletteEditor
+ * - Handle color editing events from ColorPicker
  * - Update PaletteModel based on user actions
  * - Provide public API for external control
  *
@@ -37,7 +39,8 @@ import type { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
  * ```typescript
  * const controller = new PaletteController(
  *   paletteModel,
- *   paletteEditorView
+ *   paletteEditorView,
+ *   colorPickerView // optional
  * );
  *
  * // The controller is now active and handling all interactions
@@ -47,19 +50,30 @@ import type { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
  * ```
  */
 export class PaletteController {
+  private colorPicker: ColorPicker | null = null;
+
   constructor(
     private paletteModel: PaletteModel,
-    private view: PaletteEditor
+    private view: PaletteEditor,
+    colorPicker?: ColorPicker
   ) {
-    this.setupView();
+    if (colorPicker) {
+      this.colorPicker = colorPicker;
+    }
+
+    this.setupViews();
     this.attachViewListeners();
   }
 
   /**
-   * Inject Model into View to wire up the MVC connection
+   * Inject Model into Views to wire up the MVC connection
    */
-  private setupView(): void {
+  private setupViews(): void {
     this.view.setModel(this.paletteModel);
+
+    if (this.colorPicker) {
+      this.colorPicker.setModel(this.paletteModel);
+    }
   }
 
   /**
@@ -71,6 +85,10 @@ export class PaletteController {
       "subpalette-change-clicked",
       this.handleSubPaletteChange
     );
+
+    if (this.colorPicker) {
+      this.colorPicker.addEventListener("color-edit", this.handleColorEdit);
+    }
   }
 
   /**
@@ -93,6 +111,23 @@ export class PaletteController {
 
     // Update the Model - this will trigger View re-render via events
     this.paletteModel.setActiveSubPalette(subPaletteIndex);
+  };
+
+  /**
+   * Handle color edit event from ColorPicker
+   */
+  private handleColorEdit = (e: Event): void => {
+    const customEvent = e as CustomEvent<{
+      paletteIdx: number;
+      colorIdx: number;
+      r: number;
+      g: number;
+      b: number;
+    }>;
+    const { paletteIdx, colorIdx, r, g, b } = customEvent.detail;
+
+    // Update the Model - this will trigger View re-render via events
+    this.paletteModel.setColor(paletteIdx, colorIdx, r, g, b);
   };
 
   /**
@@ -146,5 +181,9 @@ export class PaletteController {
       "subpalette-change-clicked",
       this.handleSubPaletteChange
     );
+
+    if (this.colorPicker) {
+      this.colorPicker.removeEventListener("color-edit", this.handleColorEdit);
+    }
   }
 }

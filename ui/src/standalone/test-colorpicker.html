@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ColorPicker Test - Semitile</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #1a1a2e;
+        color: #ffffff;
+        padding: 2rem;
+        line-height: 1.6;
+        margin: 0;
+      }
+
+      h1 {
+        color: #00ff88;
+        border-bottom: 2px solid #00ff88;
+        padding-bottom: 0.5rem;
+        margin-top: 0;
+      }
+
+      h2 {
+        color: #00d4ff;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .app-container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .panel {
+        background: #16213e;
+        padding: 1.5rem;
+        border-radius: 8px;
+        border: 1px solid #0f3460;
+      }
+
+      .status {
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        font-weight: 600;
+      }
+
+      .status.loading {
+        background: #0f3460;
+        color: #00d4ff;
+      }
+
+      .status.ready {
+        background: #003d2e;
+        color: #00ff88;
+      }
+
+      .status.error {
+        background: #4d0026;
+        color: #ff0088;
+      }
+
+      .info-text {
+        color: #b8b8b8;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        margin: 0.5rem 0;
+      }
+
+      .component-section {
+        margin: 1.5rem 0;
+      }
+
+      .divider {
+        height: 1px;
+        background: #0f3460;
+        margin: 1.5rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <h1>🎨 ColorPicker Component Test (Stage 8)</h1>
+      <p class="info-text">
+        This demonstrates the ColorPicker View component integrated with
+        PaletteEditor and PaletteController, completing the palette editing system.
+      </p>
+
+      <div id="status" class="status loading">Loading WASM module...</div>
+
+      <div id="test-content" style="display: none">
+        <div class="layout">
+          <!-- Left Panel: ColorPicker -->
+          <div class="panel">
+            <h2>Color Picker</h2>
+            <p class="info-text">
+              Edit the selected color using RGB555 sliders (5-bit, 0-31 range) or hex
+              input. Changes are applied in real-time.
+            </p>
+
+            <color-picker id="color-picker"></color-picker>
+
+            <div class="divider"></div>
+
+            <h2>Instructions</h2>
+            <p class="info-text">
+              1. Select a color from the palette<br />
+              2. Adjust RGB sliders or enter hex value<br />
+              3. Watch the palette update in real-time<br />
+              4. Switch sub-palettes to edit different color sets
+            </p>
+          </div>
+
+          <!-- Right Panel: Palette Editor -->
+          <div class="panel">
+            <h2>Palette Editor</h2>
+            <p class="info-text">
+              Select a color to edit it with the ColorPicker. The selected color is
+              highlighted with a green border.
+            </p>
+
+            <div class="component-section">
+              <palette-editor id="palette-editor"></palette-editor>
+            </div>
+
+            <div class="divider"></div>
+
+            <h2>MVC Data Flow</h2>
+            <p class="info-text">
+              <strong>Model (PaletteModel):</strong> Single source of truth for all
+              256 colors<br /><br />
+              <strong>Views:</strong>
+              <br />
+              • PaletteEditor: Displays colors, dispatches selection events<br />
+              • ColorPicker: Displays RGB sliders, dispatches edit events<br /><br />
+              <strong>Controller (PaletteController):</strong> Coordinates both views
+              <br />
+              • Handles color selection from PaletteEditor<br />
+              • Handles color editing from ColorPicker<br />
+              • Updates Model, which triggers both Views to re-render<br /><br />
+              <strong>Flow:</strong> User adjusts slider → ColorPicker dispatches
+              'color-edit' → Controller updates Model → Model emits 'colorChanged' →
+              Both Views re-render with new color
+            </p>
+
+            <div class="divider"></div>
+
+            <h2>RGB555 Color Format</h2>
+            <p class="info-text">
+              Cicada-16 uses RGB555 format (15-bit color):<br />
+              • 5 bits per channel (0-31 range)<br />
+              • Total: 32,768 possible colors<br />
+              • Format: 0bRRRRRGGGGGBBBBB<br />
+              • Hex: 0x0000 to 0x7FFF<br /><br />
+              The ColorPicker automatically converts between RGB555 (5-bit) and RGB888
+              (8-bit) for display in browsers.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initWasm, WasmPalette } from "../lib/wasm-loader.js";
+      import { PaletteModel } from "../models/PaletteModel.js";
+      import { PaletteEditor } from "../views/PaletteEditor/PaletteEditor.js";
+      import { ColorPicker } from "../views/ColorPicker/ColorPicker.js";
+      import { PaletteController } from "../controllers/PaletteController.js";
+
+      let paletteModel, paletteEditor, colorPicker, paletteController;
+
+      // Initialize WASM and set up MVC
+      async function init() {
+        const statusDiv = document.getElementById("status");
+        const testContent = document.getElementById("test-content");
+
+        try {
+          await initWasm();
+          statusDiv.className = "status ready";
+          statusDiv.textContent =
+            "✓ Ready - ColorPicker + PaletteEditor MVC initialized";
+          testContent.style.display = "block";
+
+          // Create Model
+          paletteModel = new PaletteModel(new WasmPalette());
+
+          // Set up default palette with varied colors
+          setupDefaultPalette();
+
+          // Get the Views
+          paletteEditor = document.getElementById("palette-editor");
+          colorPicker = document.getElementById("color-picker");
+
+          // Create the Controller - this wires everything together!
+          // The controller handles both PaletteEditor and ColorPicker
+          paletteController = new PaletteController(
+            paletteModel,
+            paletteEditor,
+            colorPicker // Pass ColorPicker as optional third parameter
+          );
+
+          console.log("ColorPicker + PaletteEditor MVC initialized");
+        } catch (error) {
+          statusDiv.className = "status error";
+          statusDiv.textContent = `✗ Failed to initialize: ${error.message}`;
+          console.error("Initialization error:", error);
+        }
+      }
+
+      function setupDefaultPalette() {
+        // Sub-palette 0: Basic colors
+        const palette0 = [
+          { r: 0, g: 0, b: 0 }, // 0: Black (transparent)
+          { r: 255, g: 255, b: 255 }, // 1: White
+          { r: 255, g: 0, b: 0 }, // 2: Red
+          { r: 0, g: 255, b: 0 }, // 3: Green
+          { r: 0, g: 0, b: 255 }, // 4: Blue
+          { r: 255, g: 255, b: 0 }, // 5: Yellow
+          { r: 255, g: 0, b: 255 }, // 6: Magenta
+          { r: 0, g: 255, b: 255 }, // 7: Cyan
+          { r: 128, g: 128, b: 128 }, // 8: Gray
+          { r: 255, g: 128, b: 0 }, // 9: Orange
+          { r: 128, g: 0, b: 255 }, // 10: Purple
+          { r: 0, g: 128, b: 128 }, // 11: Teal
+          { r: 128, g: 64, b: 0 }, // 12: Brown
+          { r: 255, g: 192, b: 203 }, // 13: Pink
+          { r: 64, g: 64, b: 64 }, // 14: Dark Gray
+          { r: 192, g: 192, b: 192 }, // 15: Light Gray
+        ];
+
+        palette0.forEach((color, idx) => {
+          paletteModel.setColor(0, idx, color.r, color.g, color.b);
+        });
+
+        // Sub-palette 1: Warm gradient
+        for (let i = 0; i < 16; i++) {
+          const r = Math.floor(128 + (i / 15) * 127);
+          const g = Math.floor((i / 15) * 128);
+          const b = 0;
+          paletteModel.setColor(1, i, r, g, b);
+        }
+
+        // Sub-palette 2: Cool gradient
+        for (let i = 0; i < 16; i++) {
+          const r = 0;
+          const g = Math.floor((i / 15) * 128);
+          const b = Math.floor(128 + (i / 15) * 127);
+          paletteModel.setColor(2, i, r, g, b);
+        }
+
+        // Sub-palette 3: Green gradient
+        for (let i = 0; i < 16; i++) {
+          const r = 0;
+          const g = Math.floor((i / 15) * 255);
+          const b = 0;
+          paletteModel.setColor(3, i, r, g, b);
+        }
+
+        // Sub-palette 4: Grayscale
+        for (let i = 0; i < 16; i++) {
+          const gray = Math.floor((i / 15) * 255);
+          paletteModel.setColor(4, i, gray, gray, gray);
+        }
+
+        // Sub-palette 5: Pastel colors
+        const pastels = [
+          { r: 255, g: 179, b: 186 }, // Pink
+          { r: 255, g: 223, b: 186 }, // Peach
+          { r: 255, g: 255, b: 186 }, // Pale Yellow
+          { r: 186, g: 255, b: 201 }, // Mint
+          { r: 186, g: 225, b: 255 }, // Baby Blue
+          { r: 220, g: 186, b: 255 }, // Lavender
+          { r: 255, g: 186, b: 230 }, // Light Pink
+          { r: 255, g: 214, b: 186 }, // Apricot
+          { r: 255, g: 255, b: 224 }, // Cream
+          { r: 204, g: 255, b: 204 }, // Pale Green
+          { r: 204, g: 229, b: 255 }, // Sky Blue
+          { r: 229, g: 204, b: 255 }, // Lilac
+          { r: 255, g: 204, b: 229 }, // Rose
+          { r: 255, g: 235, b: 204 }, // Champagne
+          { r: 240, g: 240, b: 240 }, // Off White
+          { r: 200, g: 200, b: 200 }, // Light Gray
+        ];
+
+        pastels.forEach((color, idx) => {
+          paletteModel.setColor(5, idx, color.r, color.g, color.b);
+        });
+
+        // Select a colorful color by default
+        paletteModel.selectColor(2); // Red
+      }
+
+      // Initialize on page load
+      init();
+    </script>
+  </body>
+</html>
