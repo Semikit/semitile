@@ -30,6 +30,13 @@ export interface ProjectData {
   palette: {
     binary: string; // Base64 encoded RGB555 data
   };
+  tilemaps?: Array<{
+    // Array of tilemaps (optional for backwards compatibility)
+    width: number;
+    height: number;
+    data: string; // Base64 encoded tilemap data
+  }>;
+  activeTilemapIndex?: number; // Index of the active tilemap (optional, defaults to 0)
 }
 
 /**

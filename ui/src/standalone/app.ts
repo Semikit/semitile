@@ -18,13 +18,13 @@
  */
 
 // WASM Loader
-import { initWasm, WasmPalette, WasmTilemap } from "../lib/wasm-loader.js";
+import { initWasm, WasmPalette } from "../lib/wasm-loader.js";
 
 // Models
 import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
 import { EditorState } from "../models/EditorState.js";
-import { TilemapModel } from "../models/TilemapModel.js";
+import { TilemapBankModel } from "../models/TilemapBankModel.js";
 
 // Views
 import { TileCanvas } from "../views/TileCanvas/TileCanvas.js";
@@ -34,6 +34,7 @@ import { ToolPanel } from "../views/ToolPanel/ToolPanel.js";
 import { TileBank } from "../views/TileBank/TileBank.js";
 import { TilemapEditor } from "../views/TilemapEditor/TilemapEditor.js";
 import { TileAttributesPanel } from "../views/TileAttributesPanel/TileAttributesPanel.js";
+import { TilemapBank } from "../views/TilemapBank/TilemapBank.js";
 
 // Controllers
 import { TileEditorController } from "../controllers/TileEditorController.js";
@@ -41,6 +42,7 @@ import { PaletteController } from "../controllers/PaletteController.js";
 import { FileController } from "../controllers/FileController.js";
 import { TileBankController } from "../controllers/TileBankController.js";
 import { TilemapController } from "../controllers/TilemapController.js";
+import { TilemapBankController } from "../controllers/TilemapBankController.js";
 
 // Command History
 import { CommandHistory } from "../models/CommandHistory.js";
@@ -71,7 +73,7 @@ async function main() {
     const tileBankModel = new TileBankModel(); // Starts with one empty tile
     const paletteModel = new PaletteModel(new WasmPalette());
     const editorState = new EditorState();
-    const tilemapModel = new TilemapModel(new WasmTilemap(32, 32)); // Default 32×32 tilemap
+    const tilemapBankModel = new TilemapBankModel(); // Starts with one 32×32 tilemap
 
     console.log("[App] Models created");
 
@@ -87,9 +89,10 @@ async function main() {
     const toolPanel = document.getElementById("tool-panel") as ToolPanel;
     const tileBank = document.getElementById("tile-bank") as TileBank;
     const tilemapEditor = document.getElementById("tilemap-editor") as TilemapEditor;
+    const tilemapBank = document.getElementById("tilemap-bank") as TilemapBank;
     const tileAttributesPanel = document.getElementById("tile-attributes") as TileAttributesPanel;
 
-    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel || !tileBank || !tilemapEditor || !tileAttributesPanel) {
+    if (!tileCanvas || !paletteEditor || !colorPicker || !toolPanel || !tileBank || !tilemapEditor || !tilemapBank || !tileAttributesPanel) {
       throw new Error("Failed to get View elements from DOM");
     }
 
@@ -127,18 +130,32 @@ async function main() {
       tileBank
     );
 
+    // Tilemap Bank Controller - handles tilemap bank management
+    const tilemapBankController = new TilemapBankController(
+      tilemapBankModel,
+      tilemapBank
+    );
+
     // Tilemap Controller - handles tilemap editing
     const tilemapController = new TilemapController(
-      tilemapModel,
+      tilemapBankModel.getActiveTilemap(),
       tileBankModel,
       tilemapEditor
     );
 
     // Wire up TilemapEditor View to Models
-    tilemapEditor.setModels(tilemapModel, tileBankModel, paletteModel);
+    tilemapEditor.setModels(tilemapBankModel.getActiveTilemap(), tileBankModel, paletteModel);
 
-    // File Controller - handles save/load/export operations (now with tilemap support)
-    const fileController = new FileController(tileBankModel, paletteModel, tilemapModel);
+    // Update TilemapEditor and TilemapController when active tilemap changes
+    tilemapBankModel.on("activeTilemapChanged", () => {
+      const activeTilemap = tilemapBankModel.getActiveTilemap();
+      tilemapEditor.setModels(activeTilemap, tileBankModel, paletteModel);
+      tilemapController.setModel(activeTilemap);
+      console.log("[App] Active tilemap changed");
+    });
+
+    // File Controller - handles save/load/export operations (now with multi-tilemap support)
+    const fileController = new FileController(tileBankModel, paletteModel, tilemapBankModel);
 
     console.log("[App] Controllers created and wired");
 

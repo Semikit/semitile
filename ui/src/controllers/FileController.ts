@@ -19,7 +19,7 @@
 
 import { TileBankModel } from "../models/TileBankModel.js";
 import { PaletteModel } from "../models/PaletteModel.js";
-import { TilemapModel } from "../models/TilemapModel.js";
+import { TilemapBankModel } from "../models/TilemapBankModel.js";
 import { ExportManager } from "../lib/ExportManager.js";
 import { getStorage, type ProjectData } from "../lib/storage.js";
 
@@ -49,7 +49,7 @@ export class FileController {
   constructor(
     private tileBankModel: TileBankModel,
     private paletteModel: PaletteModel,
-    private tilemapModel?: TilemapModel
+    private tilemapBankModel?: TilemapBankModel
   ) {}
 
   /**
@@ -63,6 +63,19 @@ export class FileController {
     const tilesBase64 = allTiles.map((tile) => this.arrayToBase64(tile));
     const paletteBinary = this.paletteModel.exportBinary();
 
+    // Encode all tilemaps to base64
+    let tilemapsData: Array<{ width: number; height: number; data: string }> | undefined = undefined;
+    let activeTilemapIndex: number | undefined = undefined;
+    if (this.tilemapBankModel) {
+      const allTilemaps = this.tilemapBankModel.exportAllTilemaps();
+      tilemapsData = allTilemaps.map((tilemap) => ({
+        width: tilemap.width,
+        height: tilemap.height,
+        data: this.arrayToBase64(tilemap.data),
+      }));
+      activeTilemapIndex = this.tilemapBankModel.getActiveTilemapIndex();
+    }
+
     const projectData: ProjectData = {
       name: projectName,
       version: "1.0",
@@ -73,6 +86,8 @@ export class FileController {
       palette: {
         binary: this.arrayToBase64(paletteBinary),
       },
+      tilemaps: tilemapsData,
+      activeTilemapIndex,
     };
 
     const storage = await getStorage();
@@ -80,7 +95,9 @@ export class FileController {
 
     this.currentProjectName = projectName;
 
-    console.log(`[FileController] Project saved: ${projectName} (${tilesBase64.length} tiles)`);
+    console.log(
+      `[FileController] Project saved: ${projectName} (${tilesBase64.length} tiles, ${tilemapsData?.length || 0} tilemaps)`
+    );
   }
 
   /**
@@ -119,9 +136,31 @@ export class FileController {
       this.tileBankModel.setActiveTile(projectData.activeTileIndex);
     }
 
+    // Decode and import tilemaps if present
+    if (this.tilemapBankModel && projectData.tilemaps) {
+      const tilemaps = projectData.tilemaps.map((tilemapData) => ({
+        width: tilemapData.width,
+        height: tilemapData.height,
+        data: this.base64ToArray(tilemapData.data),
+      }));
+
+      this.tilemapBankModel.importTilemaps(tilemaps);
+
+      // Restore active tilemap index
+      if (
+        projectData.activeTilemapIndex !== undefined &&
+        projectData.activeTilemapIndex >= 0 &&
+        projectData.activeTilemapIndex < tilemaps.length
+      ) {
+        this.tilemapBankModel.setActiveTilemap(projectData.activeTilemapIndex);
+      }
+    }
+
     this.currentProjectName = name;
 
-    console.log(`[FileController] Project loaded: ${name} (${tiles.length} tiles)`);
+    console.log(
+      `[FileController] Project loaded: ${name} (${tiles.length} tiles, ${projectData.tilemaps?.length || 0} tilemaps)`
+    );
     return true;
   }
 
@@ -472,35 +511,37 @@ export class FileController {
   }
 
   /**
-   * Export tilemap to binary file (.bin)
+   * Export active tilemap to binary file (.bin)
    */
   exportTilemapBinary(filename: string = "tilemap.bin"): void {
-    if (!this.tilemapModel) {
-      console.error("[FileController] No tilemap model available");
+    if (!this.tilemapBankModel) {
+      console.error("[FileController] No tilemap bank model available");
       return;
     }
 
-    const data = this.tilemapModel.exportBinary();
+    const tilemap = this.tilemapBankModel.getActiveTilemap();
+    const data = tilemap.exportBinary();
     ExportManager.downloadFile(data, filename);
     console.log(
-      `[FileController] Exported tilemap binary: ${filename} (${this.tilemapModel.getWidth()}x${this.tilemapModel.getHeight()})`
+      `[FileController] Exported tilemap binary: ${filename} (${tilemap.getWidth()}x${tilemap.getHeight()})`
     );
   }
 
   /**
-   * Export tilemap to C header (.h)
+   * Export active tilemap to C header (.h)
    */
   exportTilemapCHeader(filename: string = "tilemap.h"): void {
-    if (!this.tilemapModel) {
-      console.error("[FileController] No tilemap model available");
+    if (!this.tilemapBankModel) {
+      console.error("[FileController] No tilemap bank model available");
       return;
     }
 
+    const tilemap = this.tilemapBankModel.getActiveTilemap();
     const name = filename.replace(/\.h$/, "");
     const variableName = this.sanitizeName(name);
-    const width = this.tilemapModel.getWidth();
-    const height = this.tilemapModel.getHeight();
-    const data = this.tilemapModel.exportBinary();
+    const width = tilemap.getWidth();
+    const height = tilemap.getHeight();
+    const data = tilemap.exportBinary();
 
     let header = `// Tilemap data: ${name}\n`;
     header += `// ${width}x${height} tiles, 2 bytes per entry\n`;
@@ -538,19 +579,20 @@ export class FileController {
   }
 
   /**
-   * Export tilemap to Assembly file (.asm)
+   * Export active tilemap to Assembly file (.asm)
    */
   exportTilemapASM(filename: string = "tilemap.asm"): void {
-    if (!this.tilemapModel) {
-      console.error("[FileController] No tilemap model available");
+    if (!this.tilemapBankModel) {
+      console.error("[FileController] No tilemap bank model available");
       return;
     }
 
+    const tilemap = this.tilemapBankModel.getActiveTilemap();
     const name = filename.replace(/\.asm$/, "");
     const labelName = this.sanitizeName(name);
-    const width = this.tilemapModel.getWidth();
-    const height = this.tilemapModel.getHeight();
-    const data = this.tilemapModel.exportBinary();
+    const width = tilemap.getWidth();
+    const height = tilemap.getHeight();
+    const data = tilemap.exportBinary();
 
     let asm = `; Tilemap data: ${name}\n`;
     asm += `; ${width}x${height} tiles, 2 bytes per entry\n`;

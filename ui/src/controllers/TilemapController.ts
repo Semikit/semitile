@@ -60,6 +60,13 @@ export class TilemapController {
   }
 
   /**
+   * Update the tilemap model (for switching between tilemaps in a bank)
+   */
+  setModel(tilemapModel: TilemapModel): void {
+    this.tilemapModel = tilemapModel;
+  }
+
+  /**
    * Attach listeners to View events
    */
   private attachViewListeners(): void {

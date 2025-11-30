@@ -1,0 +1,134 @@
+/*
+ * TilemapBank Component Styles
+ */
+
+.tilemap-bank-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 8px);
+  background: var(--c16-bg-dark, #1a1a2e);
+  border: 2px solid var(--c16-bg-light, #0f3460);
+  border-radius: var(--radius-md, 4px);
+  padding: var(--spacing-md, 16px);
+  min-width: 240px;
+}
+
+.bank-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+}
+
+.bank-title {
+  margin: 0;
+  font-size: var(--text-md, 15px);
+  font-weight: 600;
+  color: var(--c16-primary, #00ff88);
+}
+
+.add-button {
+  background: var(--c16-primary, #00ff88);
+  color: var(--c16-bg-dark, #1a1a2e);
+  border: none;
+  border-radius: var(--radius-sm, 2px);
+  padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-button:hover {
+  background: var(--c16-primary-dark, #00cc6a);
+  transform: translateY(-1px);
+}
+
+.add-button:active {
+  transform: translateY(0);
+}
+
+.tilemap-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 4px);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tilemap-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  padding: var(--spacing-sm, 8px);
+  background: var(--c16-bg-medium, #16213e);
+  border: 2px solid var(--c16-bg-light, #0f3460);
+  border-radius: var(--radius-sm, 2px);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tilemap-item:hover {
+  border-color: var(--c16-primary, #00ff88);
+  background: var(--c16-bg-light, #0f3460);
+}
+
+.tilemap-item.active {
+  border-color: var(--c16-primary, #00ff88);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.tilemap-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.tilemap-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  color: var(--c16-text-primary, #ffffff);
+}
+
+.tilemap-item.active .tilemap-label {
+  color: var(--c16-primary, #00ff88);
+}
+
+.tilemap-size {
+  font-size: var(--text-xs, 11px);
+  color: var(--c16-text-secondary, #b8b8b8);
+  font-family: var(--font-mono, "SF Mono", monospace);
+}
+
+.tilemap-actions {
+  display: flex;
+  gap: var(--spacing-xs, 4px);
+}
+
+.action-button {
+  background: transparent;
+  border: 1px solid var(--c16-bg-light, #0f3460);
+  border-radius: var(--radius-sm, 2px);
+  padding: 4px 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.action-button:hover:not(:disabled) {
+  border-color: var(--c16-primary, #00ff88);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.action-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.action-button.delete:hover:not(:disabled) {
+  border-color: var(--c16-secondary, #ff0088);
+  background: rgba(255, 0, 136, 0.1);
+}
