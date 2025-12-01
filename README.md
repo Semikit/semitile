@@ -12,10 +12,11 @@ Semitile is a focused, browser-based tool for creating graphics assets for the C
 - **4bpp Planar Format** - Native support for Cicada-16's 4-bit planar tile encoding
 - **RGB555 Palette System** - 16 sub-palettes of 16 colors each (256 total colors)
 - **Tilemap Editor** - Arrange tiles into scenes with support for all Cicada-16 BG_MODE sizes
+- **Screen Viewport Overlay** - Visualize the 30×20 tile (240×160 pixel) screen area with draggable overlay and SCX0/SCY0 register values
 - **Tile Attributes** - Configure palette, horizontal/vertical flip, and priority per tile
 - **Multi-Tile Management** - Tile bank with add, delete, duplicate, and reorder operations
 - **Multi-Tilemap Support** - Create and manage multiple tilemaps in a single project
-- **Export Formats** - Binary, C headers, and Assembly exports for tiles, palettes, and tilemaps
+- **Export Formats** - Binary, C headers, Assembly, and PNG exports for tiles, palettes, and tilemaps
 - **Project Management** - Save/load projects to browser storage or export as JSON
 - **Undo/Redo** - Full command history for all editing operations
 - **MVC Architecture** - Clean separation of Models, Views, and Controllers
@@ -370,6 +371,10 @@ Semitile can export assets in multiple formats:
 - **Tile Assembly (.asm)** - Assembly data directives
 - **Palette Assembly (.asm)** - Assembly data directives
 - **Tilemap Assembly (.asm)** - Assembly data directives
+
+### Image Exports
+
+- **Tilemap PNG (.png)** - Rendered tilemap as PNG image with configurable pixel size
 
 ### Project Format
 

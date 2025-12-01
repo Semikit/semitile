@@ -52,6 +52,8 @@ import styles from "./TilemapEditor.css?inline";
 export class TilemapEditor extends HTMLElement {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
+  private overlayCanvas: HTMLCanvasElement | null = null; // Separate canvas for viewport overlay
+  private overlayCtx: CanvasRenderingContext2D | null = null;
   private tilemapModel: TilemapModel | null = null;
   private tileBankModel: TileBankModel | null = null;
   private paletteModel: PaletteModel | null = null;
@@ -64,6 +66,19 @@ export class TilemapEditor extends HTMLElement {
   private rafPending: boolean = false; // Tracks if a redraw is already scheduled
   private dirtyTiles: Set<string> = new Set(); // Track which tiles need rerendering
   private fullRedrawNeeded: boolean = false; // Flag for full redraws
+  private viewportRedrawNeeded: boolean = false; // Flag for viewport-only redraws
+
+  // Viewport overlay state (Cicada-16 screen reference)
+  private viewportEnabled: boolean = false;
+  private viewportX: number = 0; // Viewport position in pixels
+  private viewportY: number = 0;
+  private isDraggingViewport: boolean = false;
+  private viewportDragOffsetX: number = 0;
+  private viewportDragOffsetY: number = 0;
+  private readonly VIEWPORT_WIDTH_PIXELS: number = 240; // Cicada-16 screen width in pixels
+  private readonly VIEWPORT_HEIGHT_PIXELS: number = 160; // Cicada-16 screen height in pixels
+  private readonly VIEWPORT_WIDTH_TILES: number = 30; // 240 / 8 = 30 tiles
+  private readonly VIEWPORT_HEIGHT_TILES: number = 20; // 160 / 8 = 20 tiles
 
   constructor() {
     super();
@@ -152,12 +167,17 @@ export class TilemapEditor extends HTMLElement {
   }
 
   /**
-   * Perform the actual redraw - either incremental or full
+   * Perform the actual redraw - either incremental, full, or viewport-only
    */
   private performRedraw(): void {
     if (this.fullRedrawNeeded) {
       this.redraw();
       this.fullRedrawNeeded = false;
+      // Also redraw viewport after full redraw
+      if (this.viewportEnabled) {
+        this.drawViewportOverlay();
+      }
+      this.viewportRedrawNeeded = false;
     } else if (this.dirtyTiles.size > 0) {
       // Incremental redraw - only redraw changed tiles
       for (const key of this.dirtyTiles) {
@@ -165,6 +185,16 @@ export class TilemapEditor extends HTMLElement {
         this.renderTile(x, y);
       }
       this.dirtyTiles.clear();
+
+      // If viewport also needs redraw, do it after tiles
+      if (this.viewportRedrawNeeded && this.viewportEnabled) {
+        this.drawViewportOverlay();
+        this.viewportRedrawNeeded = false;
+      }
+    } else if (this.viewportRedrawNeeded) {
+      // Viewport-only redraw - just redraw the overlay canvas (SUPER FAST)
+      this.drawViewportOverlay();
+      this.viewportRedrawNeeded = false;
     }
   }
 
@@ -200,26 +230,47 @@ export class TilemapEditor extends HTMLElement {
     if (!this.shadowRoot) return;
 
     this.shadowRoot.innerHTML = `
-      <style>${styles}</style>
+      <style>
+        ${styles}
+        .canvas-container {
+          position: relative;
+          display: inline-block;
+        }
+        #overlay-canvas {
+          position: absolute;
+          top: 0;
+          left: 0;
+          pointer-events: none;
+        }
+      </style>
       <div class="tilemap-editor">
-        <canvas id="tilemap-canvas"></canvas>
+        <div class="canvas-container">
+          <canvas id="tilemap-canvas"></canvas>
+          <canvas id="overlay-canvas"></canvas>
+        </div>
       </div>
     `;
   }
 
   /**
-   * Setup canvas element
+   * Setup canvas elements
    */
   private setupCanvas(): void {
     this.canvas = this.shadowRoot?.getElementById("tilemap-canvas") as HTMLCanvasElement;
-    if (!this.canvas) return;
+    this.overlayCanvas = this.shadowRoot?.getElementById("overlay-canvas") as HTMLCanvasElement;
+
+    if (!this.canvas || !this.overlayCanvas) return;
 
     this.ctx = this.canvas.getContext("2d", { alpha: false });
-    if (!this.ctx) return;
+    this.overlayCtx = this.overlayCanvas.getContext("2d", { alpha: true });
+
+    if (!this.ctx || !this.overlayCtx) return;
 
     // Set initial canvas size
     this.canvas.width = 512;
     this.canvas.height = 512;
+    this.overlayCanvas.width = 512;
+    this.overlayCanvas.height = 512;
   }
 
   /**
@@ -240,8 +291,16 @@ export class TilemapEditor extends HTMLElement {
     if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
       this.canvas.width = canvasWidth;
       this.canvas.height = canvasHeight;
+      // Also resize overlay canvas
+      if (this.overlayCanvas) {
+        this.overlayCanvas.width = canvasWidth;
+        this.overlayCanvas.height = canvasHeight;
+      }
       // Need to get context again after resizing
       this.ctx = this.canvas.getContext("2d", { alpha: false });
+      if (this.overlayCanvas) {
+        this.overlayCtx = this.overlayCanvas.getContext("2d", { alpha: true });
+      }
       if (!this.ctx) return;
     }
 
@@ -264,6 +323,8 @@ export class TilemapEditor extends HTMLElement {
 
     // Draw grid
     this.drawGrid(width, height);
+
+    // Viewport overlay is drawn on separate canvas, not here
   }
 
   /**
@@ -388,25 +449,61 @@ export class TilemapEditor extends HTMLElement {
   }
 
   /**
-   * Handle mouse down - start placing tiles
+   * Handle mouse down - start placing tiles or dragging viewport
    */
   private handleMouseDown = (e: MouseEvent): void => {
+    if (!this.canvas) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Check if clicking inside viewport rectangle
+    if (this.viewportEnabled && this.isInsideViewport(mouseX, mouseY)) {
+      this.isDraggingViewport = true;
+      this.viewportDragOffsetX = mouseX - (this.viewportX - this.scrollX);
+      this.viewportDragOffsetY = mouseY - (this.viewportY - this.scrollY);
+      e.preventDefault();
+      return;
+    }
+
     this.isPlacing = true;
     this.dispatchTilePlaceEvent("tile-place-start", e);
   };
 
   /**
-   * Handle mouse move - continue placing tiles
+   * Handle mouse move - continue placing tiles or dragging viewport
    */
   private handleMouseMove = (e: MouseEvent): void => {
+    if (!this.canvas) return;
+
+    // Handle viewport dragging
+    if (this.isDraggingViewport) {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const newX = mouseX - this.viewportDragOffsetX + this.scrollX;
+      const newY = mouseY - this.viewportDragOffsetY + this.scrollY;
+
+      this.setViewportPosition(Math.max(0, newX), Math.max(0, newY));
+      e.preventDefault();
+      return;
+    }
+
     if (!this.isPlacing) return;
     this.dispatchTilePlaceEvent("tile-place-move", e);
   };
 
   /**
-   * Handle mouse up - stop placing tiles
+   * Handle mouse up - stop placing tiles or dragging viewport
    */
   private handleMouseUp = (e: MouseEvent): void => {
+    if (this.isDraggingViewport) {
+      this.isDraggingViewport = false;
+      return;
+    }
+
     if (!this.isPlacing) return;
     this.isPlacing = false;
     this.dispatchTilePlaceEvent("tile-place-end", e);
@@ -458,6 +555,127 @@ export class TilemapEditor extends HTMLElement {
   setTileSize(size: number): void {
     this.tileSize = Math.max(8, Math.min(64, size));
     this.redraw();
+  }
+
+  /**
+   * Toggle viewport overlay visibility
+   */
+  setViewportEnabled(enabled: boolean): void {
+    this.viewportEnabled = enabled;
+
+    if (!enabled) {
+      // Immediately clear the overlay canvas when disabling
+      if (this.overlayCtx && this.overlayCanvas) {
+        this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+      }
+    } else {
+      // When enabling, mark that viewport needs to be drawn
+      this.viewportRedrawNeeded = true;
+      this.scheduleRedraw();
+    }
+  }
+
+  /**
+   * Get viewport enabled state
+   */
+  getViewportEnabled(): boolean {
+    return this.viewportEnabled;
+  }
+
+  /**
+   * Set viewport position (in pixels)
+   */
+  setViewportPosition(x: number, y: number): void {
+    this.viewportX = x;
+    this.viewportY = y;
+
+    // Only mark viewport redraw needed (not full redraw) for better performance
+    this.viewportRedrawNeeded = true;
+    // Use scheduled redraw to batch multiple position updates
+    this.scheduleRedraw();
+
+    // Dispatch event for external listeners
+    this.dispatchEvent(
+      new CustomEvent("viewport-changed", {
+        detail: { x: this.viewportX, y: this.viewportY },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * Get viewport position
+   */
+  getViewportPosition(): { x: number; y: number } {
+    return { x: this.viewportX, y: this.viewportY };
+  }
+
+  /**
+   * Check if a point is inside the viewport rectangle
+   */
+  private isInsideViewport(screenX: number, screenY: number): boolean {
+    const viewportScreenX = this.viewportX - this.scrollX;
+    const viewportScreenY = this.viewportY - this.scrollY;
+    const viewportWidth = this.VIEWPORT_WIDTH_TILES * this.tileSize;
+    const viewportHeight = this.VIEWPORT_HEIGHT_TILES * this.tileSize;
+
+    return (
+      screenX >= viewportScreenX &&
+      screenX <= viewportScreenX + viewportWidth &&
+      screenY >= viewportScreenY &&
+      screenY <= viewportScreenY + viewportHeight
+    );
+  }
+
+  /**
+   * Draw viewport overlay on the separate overlay canvas
+   * This is VERY fast because it doesn't touch the tilemap canvas at all
+   */
+  private drawViewportOverlay(): void {
+    if (!this.overlayCtx || !this.overlayCanvas) return;
+
+    // Clear the overlay canvas
+    this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
+
+    if (!this.viewportEnabled) return;
+
+    const screenX = this.viewportX - this.scrollX;
+    const screenY = this.viewportY - this.scrollY;
+
+    // Calculate viewport dimensions based on tile size (scales with zoom)
+    const viewportWidth = this.VIEWPORT_WIDTH_TILES * this.tileSize;
+    const viewportHeight = this.VIEWPORT_HEIGHT_TILES * this.tileSize;
+
+    // Draw semi-transparent red rectangle
+    this.overlayCtx.strokeStyle = "rgba(255, 0, 0, 0.8)";
+    this.overlayCtx.lineWidth = 2;
+    this.overlayCtx.strokeRect(screenX, screenY, viewportWidth, viewportHeight);
+
+    // Draw corner handles
+    const handleSize = 8;
+    this.overlayCtx.fillStyle = "rgba(255, 0, 0, 0.8)";
+
+    // Top-left handle
+    this.overlayCtx.fillRect(screenX - handleSize / 2, screenY - handleSize / 2, handleSize, handleSize);
+
+    // Top-right handle
+    this.overlayCtx.fillRect(screenX + viewportWidth - handleSize / 2, screenY - handleSize / 2, handleSize, handleSize);
+
+    // Bottom-left handle
+    this.overlayCtx.fillRect(screenX - handleSize / 2, screenY + viewportHeight - handleSize / 2, handleSize, handleSize);
+
+    // Bottom-right handle
+    this.overlayCtx.fillRect(screenX + viewportWidth - handleSize / 2, screenY + viewportHeight - handleSize / 2, handleSize, handleSize);
+
+    // Draw label with scroll position
+    const labelText = `Screen (${this.VIEWPORT_WIDTH_TILES}×${this.VIEWPORT_HEIGHT_TILES} tiles = ${this.VIEWPORT_WIDTH_PIXELS}×${this.VIEWPORT_HEIGHT_PIXELS}px) SCX0=${this.viewportX} SCY0=${this.viewportY}`;
+    const labelWidth = Math.max(200, this.overlayCtx.measureText(labelText).width + 8);
+    this.overlayCtx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    this.overlayCtx.fillRect(screenX, screenY - 20, labelWidth, 20);
+    this.overlayCtx.fillStyle = "rgba(255, 255, 255, 1)";
+    this.overlayCtx.font = "12px monospace";
+    this.overlayCtx.fillText(labelText, screenX + 4, screenY - 6);
   }
 }
 

@@ -19,6 +19,8 @@
 
 import type { TileModel } from "../models/TileModel.js";
 import type { PaletteModel } from "../models/PaletteModel.js";
+import type { TilemapModel } from "../models/TilemapModel.js";
+import type { TileBankModel } from "../models/TileBankModel.js";
 
 /**
  * ExportManager - Utility for exporting tile and palette data
@@ -28,6 +30,7 @@ import type { PaletteModel } from "../models/PaletteModel.js";
  * - Palette (.pal) - RGB555 palette data
  * - C header (.h) - C/C++ header files
  * - Assembly (.asm) - Assembly data files
+ * - PNG (.png) - Tilemap as PNG image
  */
 export class ExportManager {
   /**
@@ -182,6 +185,101 @@ export class ExportManager {
   }
 
   /**
+   * Export tilemap as PNG image
+   *
+   * @param tilemapModel The tilemap to export
+   * @param tileBankModel The tile bank containing the tiles
+   * @param paletteModel The palette for rendering colors
+   * @param pixelSize Pixels per tile pixel (default: 1 for 8x8 pixels per tile)
+   * @returns Promise that resolves to a Blob containing the PNG data
+   */
+  static async exportTilemapPNG(
+    tilemapModel: TilemapModel,
+    tileBankModel: TileBankModel,
+    paletteModel: PaletteModel,
+    pixelSize: number = 1,
+  ): Promise<Blob> {
+    const width = tilemapModel.getWidth();
+    const height = tilemapModel.getHeight();
+    const tileSize = 8 * pixelSize;
+
+    // Create off-screen canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = width * tileSize;
+    canvas.height = height * tileSize;
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) {
+      throw new Error("Failed to get canvas context");
+    }
+
+    // Clear canvas with background color
+    ctx.fillStyle = "#1a1a2e";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Render all tiles
+    for (let ty = 0; ty < height; ty++) {
+      for (let tx = 0; tx < width; tx++) {
+        const entry = tilemapModel.getEntry(tx, ty);
+        if (!entry) continue;
+
+        const tile = tileBankModel.getTile(entry.tileIndex);
+        if (!tile) continue;
+
+        const screenX = tx * tileSize;
+        const screenY = ty * tileSize;
+
+        // Use ImageData for efficient rendering
+        const imageData = ctx.createImageData(tileSize, tileSize);
+        const data = imageData.data;
+
+        for (let py = 0; py < 8; py++) {
+          for (let px = 0; px < 8; px++) {
+            // Apply flips if needed
+            const actualPx = entry.hFlip ? (7 - px) : px;
+            const actualPy = entry.vFlip ? (7 - py) : py;
+
+            const colorIndex = tile.getPixel(actualPx, actualPy);
+            const color = paletteModel.getColor(entry.paletteIdx, colorIndex);
+
+            // Fill the pixel block in ImageData
+            const startPixelX = px * pixelSize;
+            const startPixelY = py * pixelSize;
+            const endPixelX = (px + 1) * pixelSize;
+            const endPixelY = (py + 1) * pixelSize;
+
+            for (let y = startPixelY; y < endPixelY; y++) {
+              for (let x = startPixelX; x < endPixelX; x++) {
+                const idx = (y * tileSize + x) * 4;
+                data[idx] = color.r;
+                data[idx + 1] = color.g;
+                data[idx + 2] = color.b;
+                data[idx + 3] = 255; // Alpha
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imageData, screenX, screenY);
+      }
+    }
+
+    // Convert canvas to PNG blob
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Failed to create PNG blob"));
+          }
+        },
+        "image/png"
+      );
+    });
+  }
+
+  /**
    * Trigger browser download of a file
    */
   static downloadFile(
@@ -192,8 +290,22 @@ export class ExportManager {
     const blob =
       typeof data === "string"
         ? new Blob([data], { type: "text/plain" })
-        : new Blob([data], { type: mimeType });
+        : new Blob([data as BlobPart], { type: mimeType });
 
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Trigger browser download of a Blob
+   */
+  static downloadBlob(blob: Blob, filename: string): void {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

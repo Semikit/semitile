@@ -37,6 +37,40 @@
         </nav>
       </header>
 
+      <!-- PNG Export Options Dialog -->
+      <div id="png-export-dialog" class="dialog" style="display: none">
+        <div class="dialog-backdrop"></div>
+        <div class="dialog-content">
+          <h2 class="dialog-title">Export Tilemap as PNG</h2>
+          <p class="dialog-subtitle">Configure export settings</p>
+
+          <div class="dialog-section">
+            <label class="input-label">Pixel Size (pixels per tile pixel)</label>
+            <p class="dialog-description">
+              Controls the output resolution. Default is 1 (8×8 pixels per tile).
+              Higher values produce larger, more detailed images.
+            </p>
+            <input
+              type="number"
+              id="png-pixel-size"
+              class="text-input"
+              min="1"
+              max="16"
+              value="2"
+              title="Number of pixels per tile pixel (1-16)"
+            />
+            <p class="dialog-description" id="png-size-preview">
+              Output size: calculating...
+            </p>
+          </div>
+
+          <div class="dialog-actions">
+            <button id="png-export-confirm" class="dialog-button-primary" title="Export tilemap as PNG">Export PNG</button>
+            <button id="png-export-cancel" class="dialog-button-secondary" title="Cancel and close dialog">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Export Dialog -->
       <div id="export-dialog" class="dialog" style="display: none">
         <div class="dialog-backdrop"></div>
@@ -70,6 +104,7 @@
             <button id="export-tilemap-bin" class="dialog-button" title="Export tilemap as binary file">Tilemap Binary (.bin)</button>
             <button id="export-tilemap-h" class="dialog-button" title="Export tilemap as C header file">Tilemap C Header (.h)</button>
             <button id="export-tilemap-asm" class="dialog-button" title="Export tilemap as Assembly file">Tilemap Assembly (.asm)</button>
+            <button id="export-tilemap-png" class="dialog-button" title="Export tilemap as PNG image">Tilemap PNG (.png)</button>
           </div>
 
           <div class="dialog-section">
@@ -190,13 +225,13 @@
           </div>
           <div class="tilemap-controls">
             <div class="control-group">
-              <label class="control-label">Tilemap Size (BG_MODE):</label>
-              <div class="button-group">
-                <button id="btn-resize-32x32" class="nav-button compact" title="32×32 tiles (256×256 pixels) - Mode 00">32×32</button>
-                <button id="btn-resize-64x32" class="nav-button compact" title="64×32 tiles (512×256 pixels) - Mode 01">64×32</button>
-                <button id="btn-resize-32x64" class="nav-button compact" title="32×64 tiles (256×512 pixels) - Mode 10">32×64</button>
-                <button id="btn-resize-64x64" class="nav-button compact" title="64×64 tiles (512×512 pixels) - Mode 11">64×64</button>
-              </div>
+              <label class="control-label" for="tilemap-size-select">Tilemap Size (BG_MODE):</label>
+              <select id="tilemap-size-select" class="text-input" style="padding: 6px 8px; font-size: 13px; min-width: 200px;" title="Select tilemap size and BG_MODE">
+                <option value="32x32">32×32 tiles (256×256 px) - Mode 00</option>
+                <option value="64x32">64×32 tiles (512×256 px) - Mode 01</option>
+                <option value="32x64">32×64 tiles (256×512 px) - Mode 10</option>
+                <option value="64x64">64×64 tiles (512×512 px) - Mode 11</option>
+              </select>
             </div>
             <button id="btn-tilemap-clear" class="nav-button secondary" title="Clear entire tilemap">Clear</button>
             <button id="btn-tilemap-fill" class="nav-button secondary" title="Fill tilemap with active tile">Fill</button>
@@ -205,6 +240,28 @@
         <div class="tilemap-content">
           <tilemap-editor id="tilemap-editor"></tilemap-editor>
           <aside class="tilemap-sidebar">
+            <!-- Viewport Controls -->
+            <div class="panel-section" style="padding: 12px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; margin-bottom: 12px;">
+              <div class="panel-header" style="margin-bottom: 8px;">
+                <h3 class="panel-title" style="font-size: 14px; margin: 0;">Screen Viewport</h3>
+                <p class="panel-subtitle" style="font-size: 11px; margin: 4px 0 0 0;">30×20 tiles (240×160 pixels)</p>
+              </div>
+              <label style="display: flex; align-items: center; margin-bottom: 8px; font-size: 13px;">
+                <input type="checkbox" id="viewport-toggle" style="margin-right: 8px;" title="Toggle screen viewport overlay (240×160)">
+                Show Viewport
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label style="font-size: 12px; width: 100px;">SCX0 (Scroll X):</label>
+                  <input type="number" id="viewport-x" class="text-input" style="width: 80px; padding: 4px; font-size: 12px;" min="0" max="65535" value="0" title="Horizontal scroll position in pixels (I/O register 0xF043)">
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <label style="font-size: 12px; width: 100px;">SCY0 (Scroll Y):</label>
+                  <input type="number" id="viewport-y" class="text-input" style="width: 80px; padding: 4px; font-size: 12px;" min="0" max="65535" value="0" title="Vertical scroll position in pixels (I/O register 0xF042)">
+                </div>
+              </div>
+            </div>
+
             <tilemap-bank id="tilemap-bank"></tilemap-bank>
             <div class="panel-divider"></div>
             <tile-attributes-panel id="tile-attributes"></tile-attributes-panel>

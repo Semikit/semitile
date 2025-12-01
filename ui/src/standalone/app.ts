@@ -151,6 +151,15 @@ async function main() {
       const activeTilemap = tilemapBankModel.getActiveTilemap();
       tilemapEditor.setModels(activeTilemap, tileBankModel, paletteModel);
       tilemapController.setModel(activeTilemap);
+
+      // Update tilemap size dropdown to match new active tilemap
+      const tilemapSizeSelect = document.getElementById("tilemap-size-select") as HTMLSelectElement;
+      if (tilemapSizeSelect) {
+        const width = activeTilemap.getWidth();
+        const height = activeTilemap.getHeight();
+        tilemapSizeSelect.value = `${width}x${height}`;
+      }
+
       console.log("[App] Active tilemap changed");
     });
 
@@ -229,45 +238,102 @@ async function main() {
       });
     }
 
-    // ===== WIRE UP TILEMAP RESIZE BUTTONS =====
+    // ===== WIRE UP TILEMAP SIZE DROPDOWN =====
 
-    // Resize to 32×32 (Mode 00)
-    const btnResize32x32 = document.getElementById("btn-resize-32x32");
-    if (btnResize32x32) {
-      btnResize32x32.addEventListener("click", () => {
-        tilemapController.resize(32, 32);
-        console.log("[App] Tilemap resized to 32×32 (Mode 00)");
+    const tilemapSizeSelect = document.getElementById("tilemap-size-select") as HTMLSelectElement;
+    if (tilemapSizeSelect) {
+      tilemapSizeSelect.addEventListener("change", () => {
+        const size = tilemapSizeSelect.value;
+        switch (size) {
+          case "32x32":
+            tilemapController.resize(32, 32);
+            console.log("[App] Tilemap resized to 32×32 (Mode 00)");
+            break;
+          case "64x32":
+            tilemapController.resize(64, 32);
+            console.log("[App] Tilemap resized to 64×32 (Mode 01)");
+            break;
+          case "32x64":
+            tilemapController.resize(32, 64);
+            console.log("[App] Tilemap resized to 32×64 (Mode 10)");
+            break;
+          case "64x64":
+            tilemapController.resize(64, 64);
+            console.log("[App] Tilemap resized to 64×64 (Mode 11)");
+            break;
+        }
       });
-    }
 
-    // Resize to 64×32 (Mode 01)
-    const btnResize64x32 = document.getElementById("btn-resize-64x32");
-    if (btnResize64x32) {
-      btnResize64x32.addEventListener("click", () => {
-        tilemapController.resize(64, 32);
-        console.log("[App] Tilemap resized to 64×32 (Mode 01)");
-      });
-    }
-
-    // Resize to 32×64 (Mode 10)
-    const btnResize32x64 = document.getElementById("btn-resize-32x64");
-    if (btnResize32x64) {
-      btnResize32x64.addEventListener("click", () => {
-        tilemapController.resize(32, 64);
-        console.log("[App] Tilemap resized to 32×64 (Mode 10)");
-      });
-    }
-
-    // Resize to 64×64 (Mode 11)
-    const btnResize64x64 = document.getElementById("btn-resize-64x64");
-    if (btnResize64x64) {
-      btnResize64x64.addEventListener("click", () => {
-        tilemapController.resize(64, 64);
-        console.log("[App] Tilemap resized to 64×64 (Mode 11)");
-      });
+      // Set initial value based on current tilemap size
+      const currentTilemap = tilemapBankModel.getActiveTilemap();
+      const width = currentTilemap.getWidth();
+      const height = currentTilemap.getHeight();
+      tilemapSizeSelect.value = `${width}x${height}`;
     }
 
     console.log("[App] Tilemap control buttons wired");
+
+    // ===== WIRE UP VIEWPORT OVERLAY CONTROLS =====
+
+    const viewportToggle = document.getElementById("viewport-toggle") as HTMLInputElement;
+    const viewportXInput = document.getElementById("viewport-x") as HTMLInputElement;
+    const viewportYInput = document.getElementById("viewport-y") as HTMLInputElement;
+
+    // Toggle viewport overlay
+    if (viewportToggle) {
+      viewportToggle.addEventListener("change", () => {
+        tilemapEditor.setViewportEnabled(viewportToggle.checked);
+        console.log(`[App] Viewport overlay ${viewportToggle.checked ? "enabled" : "disabled"}`);
+      });
+    }
+
+    // Update viewport position from input fields (SCX0/SCY0 registers)
+    if (viewportXInput && viewportYInput) {
+      const updateViewportFromInputs = () => {
+        // Parse as numbers (handles multi-digit values properly)
+        const x = Number(viewportXInput.value);
+        const y = Number(viewportYInput.value);
+
+        // Validate and constrain values
+        const validX = isNaN(x) ? 0 : Math.max(0, Math.floor(x));
+        const validY = isNaN(y) ? 0 : Math.max(0, Math.floor(y));
+
+        tilemapEditor.setViewportPosition(validX, validY);
+        console.log(`[App] Viewport position set to SCX0=${validX}, SCY0=${validY}`);
+      };
+
+      viewportXInput.addEventListener("input", updateViewportFromInputs);
+      viewportYInput.addEventListener("input", updateViewportFromInputs);
+      viewportXInput.addEventListener("change", updateViewportFromInputs); // Also handle on blur/enter
+      viewportYInput.addEventListener("change", updateViewportFromInputs);
+    }
+
+    // Update input fields when viewport is dragged (update SCX0/SCY0 display)
+    // Throttle updates to avoid excessive DOM manipulation
+    let viewportUpdateTimeout: number | null = null;
+    tilemapEditor.addEventListener("viewport-changed", (e) => {
+      const customEvent = e as CustomEvent<{ x: number; y: number }>;
+
+      // Clear any pending update
+      if (viewportUpdateTimeout !== null) {
+        clearTimeout(viewportUpdateTimeout);
+      }
+
+      // Schedule update with a small delay to batch rapid changes
+      viewportUpdateTimeout = window.setTimeout(() => {
+        if (viewportXInput) {
+          const scx0 = Math.floor(customEvent.detail.x);
+          viewportXInput.value = scx0.toString();
+        }
+        if (viewportYInput) {
+          const scy0 = Math.floor(customEvent.detail.y);
+          viewportYInput.value = scy0.toString();
+        }
+        viewportUpdateTimeout = null;
+      }, 50); // 50ms delay batches updates while still feeling responsive
+    });
+
+    console.log("[App] Viewport overlay controls wired");
 
     // ===== WIRE UP NAVIGATION BUTTONS =====
 
@@ -415,6 +481,7 @@ async function main() {
     const saveDialog = document.getElementById("save-dialog");
     const loadDialog = document.getElementById("load-dialog");
     const exportDialog = document.getElementById("export-dialog");
+    const pngExportDialog = document.getElementById("png-export-dialog");
 
     // Helper functions for dialogs
     const showDialog = (dialog: HTMLElement | null) => {
@@ -695,6 +762,68 @@ async function main() {
       });
     }
 
+    // Export tilemap PNG - show options dialog
+    const btnExportTilemapPng = document.getElementById("export-tilemap-png");
+    if (btnExportTilemapPng) {
+      btnExportTilemapPng.addEventListener("click", () => {
+        // Update the size preview
+        updatePngSizePreview();
+
+        // Hide export dialog and show PNG export dialog
+        hideDialog(exportDialog);
+        showDialog(pngExportDialog);
+      });
+    }
+
+    // Update PNG export size preview
+    function updatePngSizePreview() {
+      const pixelSizeInput = document.getElementById("png-pixel-size") as HTMLInputElement;
+      const sizePreview = document.getElementById("png-size-preview");
+
+      if (pixelSizeInput && sizePreview && tilemapBankModel) {
+        const pixelSize = parseInt(pixelSizeInput.value) || 1;
+        const tilemap = tilemapBankModel.getActiveTilemap();
+        const width = tilemap.getWidth() * 8 * pixelSize;
+        const height = tilemap.getHeight() * 8 * pixelSize;
+
+        sizePreview.textContent = `Output size: ${width} × ${height} pixels (tilemap: ${tilemap.getWidth()} × ${tilemap.getHeight()} tiles)`;
+      }
+    }
+
+    // PNG pixel size input - update preview on change
+    const pngPixelSizeInput = document.getElementById("png-pixel-size") as HTMLInputElement;
+    if (pngPixelSizeInput) {
+      pngPixelSizeInput.addEventListener("input", updatePngSizePreview);
+    }
+
+    // PNG export confirm button
+    const btnPngExportConfirm = document.getElementById("png-export-confirm");
+    if (btnPngExportConfirm) {
+      btnPngExportConfirm.addEventListener("click", async () => {
+        const pixelSizeInput = document.getElementById("png-pixel-size") as HTMLInputElement;
+        const pixelSize = parseInt(pixelSizeInput.value) || 1;
+        const name = fileController.getCurrentProjectName();
+
+        try {
+          await fileController.exportTilemapPNG(`${name}_tilemap.png`, pixelSize);
+          console.log(`[App] Exported tilemap PNG with pixel size ${pixelSize}`);
+          hideDialog(pngExportDialog);
+        } catch (error) {
+          console.error("[App] Failed to export PNG:", error);
+          alert("Failed to export PNG. Check console for details.");
+        }
+      });
+    }
+
+    // PNG export cancel button
+    const btnPngExportCancel = document.getElementById("png-export-cancel");
+    if (btnPngExportCancel) {
+      btnPngExportCancel.addEventListener("click", () => {
+        hideDialog(pngExportDialog);
+        showDialog(exportDialog);
+      });
+    }
+
     // Export project JSON
     const btnExportProjectJson = document.getElementById("export-project-json");
     if (btnExportProjectJson) {
@@ -758,6 +887,16 @@ async function main() {
       const backdrop = exportDialog.querySelector(".dialog-backdrop");
       if (backdrop) {
         backdrop.addEventListener("click", () => hideDialog(exportDialog));
+      }
+    }
+
+    if (pngExportDialog) {
+      const backdrop = pngExportDialog.querySelector(".dialog-backdrop");
+      if (backdrop) {
+        backdrop.addEventListener("click", () => {
+          hideDialog(pngExportDialog);
+          showDialog(exportDialog);
+        });
       }
     }
 

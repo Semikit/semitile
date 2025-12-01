@@ -675,6 +675,35 @@ export class FileController {
   }
 
   /**
+   * Export active tilemap as PNG image
+   *
+   * @param filename - Output filename (default: "tilemap.png")
+   * @param pixelSize - Pixels per tile pixel (default: 1 for 8x8 pixels per tile)
+   */
+  async exportTilemapPNG(
+    filename: string = "tilemap.png",
+    pixelSize: number = 1,
+  ): Promise<void> {
+    if (!this.tilemapBankModel) {
+      console.error("[FileController] No tilemap bank model available");
+      return;
+    }
+
+    const tilemap = this.tilemapBankModel.getActiveTilemap();
+    const blob = await ExportManager.exportTilemapPNG(
+      tilemap,
+      this.tileBankModel,
+      this.paletteModel,
+      pixelSize,
+    );
+
+    ExportManager.downloadBlob(blob, filename);
+    console.log(
+      `[FileController] Exported tilemap PNG: ${filename} (${tilemap.getWidth()}x${tilemap.getHeight()} tiles)`,
+    );
+  }
+
+  /**
    * Export all project data as a compressed zip file
    *
    * Creates a zip containing:
