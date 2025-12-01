@@ -29,12 +29,14 @@ Semitile is a focused, browser-based tool for creating graphics assets for the C
 The easiest way to use Semitile is through the standalone web application:
 
 1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/semikit-org/semitile.git
    cd semitile
    ```
 
 2. **Build the WASM core:**
+
    ```bash
    cd web
    wasm-pack build --target web
@@ -42,13 +44,16 @@ The easiest way to use Semitile is through the standalone web application:
    ```
 
 3. **Install UI dependencies:**
+
    ```bash
    cd ui
    npm install
    ```
 
 4. **Start the development server:**
+
    ```bash
+   # (in ui/ directory)
    npm run dev
    ```
 
@@ -101,9 +106,9 @@ cp -r ui/src/ /path/to/your/project/src/semitile-ui/
 ### Basic Usage Example
 
 ```tsx
-import React, { useEffect, useState } from 'react';
-import { initWasm } from './semitile-ui/lib/wasm-loader';
-import { TileBankModel, PaletteModel, EditorState } from './semitile-ui/models';
+import React, { useEffect, useState } from "react";
+import { initWasm } from "./semitile-ui/lib/wasm-loader";
+import { TileBankModel, PaletteModel, EditorState } from "./semitile-ui/models";
 import {
   TileCanvasReact,
   PaletteEditorReact,
@@ -111,8 +116,8 @@ import {
   ToolPanelReact,
   useTileBankModel,
   usePaletteModel,
-  useEditorState
-} from './semitile-ui/react';
+  useEditorState,
+} from "./semitile-ui/react";
 
 function TileEditorApp() {
   const [models, setModels] = useState(null);
@@ -148,7 +153,13 @@ function EditorContent({ tileBankModel, paletteModel, editorState }) {
   useEditorState(editorState);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 200px', gap: '20px' }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "200px 1fr 200px",
+        gap: "20px",
+      }}
+    >
       {/* Left Panel - Tools */}
       <div>
         <ToolPanelReact editorState={editorState} />
@@ -204,12 +215,14 @@ See `ui/src/react/README.md` for complete React integration documentation.
 Semitile uses a **Model-View-Controller (MVC)** architecture:
 
 ### Models (Observable State)
+
 - Single source of truth for all application data
 - Emit events when state changes
 - Integrate with WASM for performance-critical operations
 - Framework-agnostic (can be used in any JavaScript framework)
 
 ### Views (Web Components)
+
 - Pure presentation components
 - Listen to Model events and re-render when state changes
 - Dispatch user interaction events to Controllers
@@ -217,12 +230,14 @@ Semitile uses a **Model-View-Controller (MVC)** architecture:
 - Can be used directly or wrapped for React/Vue/etc.
 
 ### Controllers (Business Logic)
+
 - Coordinate between Views and Models
 - Handle user interaction events from Views
 - Update Models based on user actions
 - Contain tool logic, validation, and business rules
 
 ### WASM Core (Rust)
+
 - High-performance tile/palette operations
 - 4bpp planar encoding/decoding
 - RGB555 color conversion
@@ -339,21 +354,25 @@ See `cicada-16/HardwareSpec/PPU_Architecture.md` for complete PPU specifications
 Semitile can export assets in multiple formats:
 
 ### Binary Exports
+
 - **Tile Binary (.bin)** - Raw 32-byte planar format per tile
 - **Palette Binary (.bin)** - 512 bytes (256 colors × 2 bytes RGB555)
 - **Tilemap Binary (.bin)** - 2 bytes per entry, little-endian
 
 ### C Header Exports
+
 - **Tile C Header (.h)** - C array with planar tile data
 - **Palette C Header (.h)** - C array with RGB555 palette data
 - **Tilemap C Header (.h)** - C array with tilemap entries
 
 ### Assembly Exports
+
 - **Tile Assembly (.asm)** - Assembly data directives
 - **Palette Assembly (.asm)** - Assembly data directives
 - **Tilemap Assembly (.asm)** - Assembly data directives
 
 ### Project Format
+
 - **Project JSON (.json)** - Complete project with all tiles, palettes, and tilemaps
 
 All binary formats are compatible with direct DMA loading to Cicada-16 VRAM/CRAM.
@@ -400,5 +419,6 @@ This program is free software: you can redistribute it and/or modify it under th
 ## Support
 
 For questions, issues, or feature requests:
+
 - Open an issue on [GitHub Issues](https://github.com/semikit-org/semitile/issues)
 - Contact: connor@cnolandev.com
