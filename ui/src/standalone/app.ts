@@ -199,32 +199,17 @@ async function main() {
       tilemapController.setVFlip(customEvent.detail.vFlip);
     });
 
+    tileAttributesPanel.addEventListener("priority-changed", (e) => {
+      const customEvent = e as CustomEvent<{ priority: boolean }>;
+      tilemapController.setPriority(customEvent.detail.priority);
+    });
+
     console.log("[App] TileAttributesPanel wired to TilemapController");
 
     // ===== WIRE UP TILEMAP CONTROL BUTTONS =====
 
-    const btnTilemapResize = document.getElementById("btn-tilemap-resize");
     const btnTilemapClear = document.getElementById("btn-tilemap-clear");
     const btnTilemapFill = document.getElementById("btn-tilemap-fill");
-
-    if (btnTilemapResize) {
-      btnTilemapResize.addEventListener("click", () => {
-        const width = prompt("Enter tilemap width (1-256):", "32");
-        const height = prompt("Enter tilemap height (1-256):", "32");
-
-        if (width && height) {
-          const w = parseInt(width, 10);
-          const h = parseInt(height, 10);
-
-          if (!isNaN(w) && !isNaN(h) && w >= 1 && w <= 256 && h >= 1 && h <= 256) {
-            tilemapController.resize(w, h);
-            console.log(`[App] Tilemap resized to ${w}×${h}`);
-          } else {
-            alert("Invalid dimensions. Please enter values between 1 and 256.");
-          }
-        }
-      });
-    }
 
     if (btnTilemapClear) {
       btnTilemapClear.addEventListener("click", () => {
@@ -241,6 +226,44 @@ async function main() {
           tilemapController.fill();
           console.log("[App] Tilemap filled with active tile");
         }
+      });
+    }
+
+    // ===== WIRE UP TILEMAP RESIZE BUTTONS =====
+
+    // Resize to 32×32 (Mode 00)
+    const btnResize32x32 = document.getElementById("btn-resize-32x32");
+    if (btnResize32x32) {
+      btnResize32x32.addEventListener("click", () => {
+        tilemapController.resize(32, 32);
+        console.log("[App] Tilemap resized to 32×32 (Mode 00)");
+      });
+    }
+
+    // Resize to 64×32 (Mode 01)
+    const btnResize64x32 = document.getElementById("btn-resize-64x32");
+    if (btnResize64x32) {
+      btnResize64x32.addEventListener("click", () => {
+        tilemapController.resize(64, 32);
+        console.log("[App] Tilemap resized to 64×32 (Mode 01)");
+      });
+    }
+
+    // Resize to 32×64 (Mode 10)
+    const btnResize32x64 = document.getElementById("btn-resize-32x64");
+    if (btnResize32x64) {
+      btnResize32x64.addEventListener("click", () => {
+        tilemapController.resize(32, 64);
+        console.log("[App] Tilemap resized to 32×64 (Mode 10)");
+      });
+    }
+
+    // Resize to 64×64 (Mode 11)
+    const btnResize64x64 = document.getElementById("btn-resize-64x64");
+    if (btnResize64x64) {
+      btnResize64x64.addEventListener("click", () => {
+        tilemapController.resize(64, 64);
+        console.log("[App] Tilemap resized to 64×64 (Mode 11)");
       });
     }
 

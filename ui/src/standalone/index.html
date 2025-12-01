@@ -189,7 +189,15 @@
             <p class="panel-subtitle">Arrange tiles into scenes</p>
           </div>
           <div class="tilemap-controls">
-            <button id="btn-tilemap-resize" class="nav-button secondary" title="Resize tilemap dimensions">Resize</button>
+            <div class="control-group">
+              <label class="control-label">Tilemap Size (BG_MODE):</label>
+              <div class="button-group">
+                <button id="btn-resize-32x32" class="nav-button compact" title="32×32 tiles (256×256 pixels) - Mode 00">32×32</button>
+                <button id="btn-resize-64x32" class="nav-button compact" title="64×32 tiles (512×256 pixels) - Mode 01">64×32</button>
+                <button id="btn-resize-32x64" class="nav-button compact" title="32×64 tiles (256×512 pixels) - Mode 10">32×64</button>
+                <button id="btn-resize-64x64" class="nav-button compact" title="64×64 tiles (512×512 pixels) - Mode 11">64×64</button>
+              </div>
+            </div>
             <button id="btn-tilemap-clear" class="nav-button secondary" title="Clear entire tilemap">Clear</button>
             <button id="btn-tilemap-fill" class="nav-button secondary" title="Fill tilemap with active tile">Fill</button>
           </div>

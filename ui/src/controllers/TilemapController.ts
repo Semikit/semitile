@@ -50,6 +50,7 @@ export class TilemapController {
   private currentPaletteIdx: number = 0;
   private currentHFlip: boolean = false;
   private currentVFlip: boolean = false;
+  private currentPriority: boolean = false;
 
   constructor(
     private tilemapModel: TilemapModel,
@@ -114,15 +115,16 @@ export class TilemapController {
       activeTileIndex,
       this.currentPaletteIdx,
       this.currentHFlip,
-      this.currentVFlip
+      this.currentVFlip,
+      this.currentPriority
     );
   }
 
   /**
-   * Set palette index for tile placement
+   * Set palette index for tile placement (0-7 for backgrounds)
    */
   setPaletteIdx(paletteIdx: number): void {
-    this.currentPaletteIdx = Math.max(0, Math.min(15, paletteIdx));
+    this.currentPaletteIdx = Math.max(0, Math.min(7, paletteIdx));
   }
 
   /**
@@ -137,6 +139,13 @@ export class TilemapController {
    */
   setVFlip(vFlip: boolean): void {
     this.currentVFlip = vFlip;
+  }
+
+  /**
+   * Set priority for tile placement
+   */
+  setPriority(priority: boolean): void {
+    this.currentPriority = priority;
   }
 
   /**
@@ -161,6 +170,13 @@ export class TilemapController {
   }
 
   /**
+   * Get current priority
+   */
+  getPriority(): boolean {
+    return this.currentPriority;
+  }
+
+  /**
    * Clear the entire tilemap
    */
   clear(): void {
@@ -176,7 +192,8 @@ export class TilemapController {
       activeTileIndex,
       this.currentPaletteIdx,
       this.currentHFlip,
-      this.currentVFlip
+      this.currentVFlip,
+      this.currentPriority
     );
   }
 

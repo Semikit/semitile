@@ -23,9 +23,10 @@ import styles from "./TileAttributesPanel.css?inline";
  * TileAttributesPanel - Pure view component for tile attribute controls
  *
  * This View displays controls for setting tile attributes:
- * - Palette index (0-15)
+ * - Palette index (0-7 for backgrounds)
  * - Horizontal flip
  * - Vertical flip
+ * - Priority (vs. sprites)
  *
  * It is a pure presentation component:
  * - Dispatches events for attribute changes
@@ -35,6 +36,7 @@ import styles from "./TileAttributesPanel.css?inline";
  * - palette-changed: { paletteIdx: number }
  * - h-flip-changed: { hFlip: boolean }
  * - v-flip-changed: { vFlip: boolean }
+ * - priority-changed: { priority: boolean }
  *
  * Usage:
  * ```typescript
@@ -49,6 +51,7 @@ export class TileAttributesPanel extends HTMLElement {
   private paletteSelect: HTMLSelectElement | null = null;
   private hFlipCheckbox: HTMLInputElement | null = null;
   private vFlipCheckbox: HTMLInputElement | null = null;
+  private priorityCheckbox: HTMLInputElement | null = null;
 
   constructor() {
     super();
@@ -74,7 +77,7 @@ export class TileAttributesPanel extends HTMLElement {
         <div class="attribute-group">
           <label for="palette-select" class="attribute-label">Palette:</label>
           <select id="palette-select" class="palette-select">
-            ${Array.from({ length: 16 }, (_, i) =>
+            ${Array.from({ length: 8 }, (_, i) =>
               `<option value="${i}">Palette ${i}</option>`
             ).join('')}
           </select>
@@ -93,6 +96,13 @@ export class TileAttributesPanel extends HTMLElement {
             <span>Vertical Flip</span>
           </label>
         </div>
+
+        <div class="attribute-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="priority" class="flip-checkbox" />
+            <span>Priority</span>
+          </label>
+        </div>
       </div>
     `;
   }
@@ -104,6 +114,7 @@ export class TileAttributesPanel extends HTMLElement {
     this.paletteSelect = this.shadowRoot?.getElementById("palette-select") as HTMLSelectElement;
     this.hFlipCheckbox = this.shadowRoot?.getElementById("h-flip") as HTMLInputElement;
     this.vFlipCheckbox = this.shadowRoot?.getElementById("v-flip") as HTMLInputElement;
+    this.priorityCheckbox = this.shadowRoot?.getElementById("priority") as HTMLInputElement;
 
     if (this.paletteSelect) {
       this.paletteSelect.addEventListener("change", this.handlePaletteChange);
@@ -115,6 +126,10 @@ export class TileAttributesPanel extends HTMLElement {
 
     if (this.vFlipCheckbox) {
       this.vFlipCheckbox.addEventListener("change", this.handleVFlipChange);
+    }
+
+    if (this.priorityCheckbox) {
+      this.priorityCheckbox.addEventListener("change", this.handlePriorityChange);
     }
   }
 
@@ -165,6 +180,21 @@ export class TileAttributesPanel extends HTMLElement {
   };
 
   /**
+   * Handle priority change
+   */
+  private handlePriorityChange = (): void => {
+    if (!this.priorityCheckbox) return;
+
+    this.dispatchEvent(
+      new CustomEvent("priority-changed", {
+        detail: { priority: this.priorityCheckbox.checked },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  /**
    * Set palette index (update UI)
    */
   setPaletteIdx(paletteIdx: number): void {
@@ -188,6 +218,15 @@ export class TileAttributesPanel extends HTMLElement {
   setVFlip(vFlip: boolean): void {
     if (this.vFlipCheckbox) {
       this.vFlipCheckbox.checked = vFlip;
+    }
+  }
+
+  /**
+   * Set priority (update UI)
+   */
+  setPriority(priority: boolean): void {
+    if (this.priorityCheckbox) {
+      this.priorityCheckbox.checked = priority;
     }
   }
 }

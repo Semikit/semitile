@@ -233,6 +233,18 @@ export class TilemapEditor extends HTMLElement {
     const width = this.tilemapModel.getWidth();
     const height = this.tilemapModel.getHeight();
 
+    // Update canvas size to match tilemap dimensions
+    const canvasWidth = width * this.tileSize;
+    const canvasHeight = height * this.tileSize;
+
+    if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
+      this.canvas.width = canvasWidth;
+      this.canvas.height = canvasHeight;
+      // Need to get context again after resizing
+      this.ctx = this.canvas.getContext("2d", { alpha: false });
+      if (!this.ctx) return;
+    }
+
     // Clear canvas
     this.ctx.fillStyle = "#1a1a2e";
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
